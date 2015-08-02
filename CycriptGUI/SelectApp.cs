@@ -13,7 +13,7 @@ namespace CycriptGUI
     public partial class selectApp : Form
     {
         static CancellationTokenSource cancellationTokenSource;
-        public List<IOsApplication> AppList;
+        public List<iOSApplication> AppList;
 
         public selectApp()
         {
@@ -61,7 +61,7 @@ namespace CycriptGUI
         #endregion
 
         #region Functions
-        DataTable createDataTable(List<IOsApplication> inputList)
+        DataTable createDataTable(List<iOSApplication> inputList)
         {
             DataTable newTable = new DataTable();
             newTable.Columns.Add("Name", typeof(string));
@@ -69,8 +69,8 @@ namespace CycriptGUI
             newTable.Columns.Add("Identifier", typeof(string));
 
             // Sorting list of applications
-            inputList.Sort(new Comparison<IOsApplication>((x, y) => string.Compare(x.Name, y.Name)));
-            foreach (IOsApplication currApp in inputList)
+            inputList.Sort(new Comparison<iOSApplication>((x, y) => string.Compare(x.Name, y.Name)));
+            foreach (iOSApplication currApp in inputList)
             {
                 newTable.Rows.Add(currApp.Name, currApp.Version, currApp.Identifier);
             }
@@ -99,7 +99,7 @@ namespace CycriptGUI
 
             // Determining application type for search and searching in properties of found applications
             string appType = selectedIndex == 0 ? "User" : (selectedIndex == 1 ? "System" : (selectedIndex == 2 ? "Any" : "None"));
-            List<IOsApplication> resultList = new List<IOsApplication>();
+            List<iOSApplication> resultList = new List<iOSApplication>();
             if (appType != "None")
             {
                 resultList = AppList.Where(x => x.Type == appType || appType == "Any").Where(x => x.Name.ToLower().Contains(searchBox.Text.ToLower())
@@ -119,7 +119,7 @@ namespace CycriptGUI
             {
                 loadingBar.Value = 0;
                 loadingBar.PerformStep();
-                resultsTable.DataSource = createDataTable(new List<IOsApplication>());
+                resultsTable.DataSource = createDataTable(new List<iOSApplication>());
                 resultsTable.Enabled = false;
                 loadingBar.Visible = true;
                 refreshButton.Enabled = false;

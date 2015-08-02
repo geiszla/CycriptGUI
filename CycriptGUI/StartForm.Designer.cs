@@ -164,6 +164,7 @@
             this.Controls.Add(this.loadButton);
             this.Controls.Add(this.newButton);
             this.Controls.Add(this.helpBox);
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "StartForm";

@@ -6,7 +6,6 @@ namespace CycriptGUI.LibIMobileDevice
 {
     class Lockdown
     {
-        const string ServiceIdentifier = "com.apple.mobile.installation_proxy";
         public enum LockdownError
         {
             LOCKDOWN_E_SUCCESS = 0,
@@ -46,24 +45,35 @@ namespace CycriptGUI.LibIMobileDevice
             LOCKDOWN_E_ESCROW_LOCKED = -35,
             LOCKDOWN_E_UNKNOWN_ERROR = -256
         }
+        const string serviceIdentifier = "com.apple.mobile.installation_proxy";
 
         // Connect
         #region Dll Imports
         [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
-        static extern LockdownError lockdownd_client_new_with_handshake(IntPtr device, out IntPtr lockDownClient, string label);
+        static extern LockdownError lockdownd_client_new_with_handshake(IntPtr devicePtr, out IntPtr lockDownClient, string label);
 
         [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
-        static extern LockdownError lockdownd_start_service(IntPtr client, string identifier, out IntPtr service);
+        static extern LockdownError lockdownd_start_service(IntPtr lockDownClient, string identifier, out IntPtr service);
         #endregion
 
         public static LockdownError Start(IntPtr device, out IntPtr client, out IntPtr service)
         {
             LockdownError returnCode = lockdownd_client_new_with_handshake(device, out client, "CycriptGUI");
-
             service = IntPtr.Zero;
-            if (returnCode == LockdownError.LOCKDOWN_E_SUCCESS)
+            if (returnCode != LockdownError.LOCKDOWN_E_SUCCESS)
             {
-                returnCode = lockdownd_start_service(client, ServiceIdentifier, out service);
+                return returnCode;
+            }
+
+            else if (client == IntPtr.Zero)
+            {
+                return LockdownError.LOCKDOWN_E_UNKNOWN_ERROR;
+            }
+
+            returnCode = lockdownd_start_service(client, serviceIdentifier, out service);
+            if (service == IntPtr.Zero)
+            {
+                return LockdownError.LOCKDOWN_E_UNKNOWN_ERROR;
             }
 
             return returnCode;
@@ -71,17 +81,25 @@ namespace CycriptGUI.LibIMobileDevice
 
         // Working With Lockdown Service
         #region Dll Imports
-        [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, EntryPoint = "lockdownd_get_device_name", CallingConvention = CallingConvention.Cdecl)]
-        public static extern LockdownError GetDeviceName(IntPtr client, out IntPtr deviceName);
-
         [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
-        static extern LockdownError lockdownd_get_value(IntPtr client, string domain, string key, out IntPtr result);
+        static extern LockdownError lockdownd_get_value(IntPtr lockdownClient, string domain, string key, out IntPtr result);
         #endregion
 
         public static LockdownError GetProperties(IntPtr lockdownClient, out XDocument result)
         {
             IntPtr resultPlist;
             LockdownError returnCode = lockdownd_get_value(lockdownClient, null, null, out resultPlist);
+
+            result = new XDocument();
+            if (returnCode != LockdownError.LOCKDOWN_E_SUCCESS)
+            {
+                return returnCode;
+            }
+
+            else if (resultPlist == IntPtr.Zero)
+            {
+                return LockdownError.LOCKDOWN_E_UNKNOWN_ERROR;
+            }
 
             result = LibiMobileDevice.PlistToXml(resultPlist);
             return returnCode;

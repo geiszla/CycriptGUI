@@ -29,35 +29,52 @@ namespace CycriptGUI.LibIMobileDevice
         static extern void plist_to_xml(IntPtr plist, out IntPtr xml, out int length);
 
         [DllImport(LibimobiledeviceDllPath, EntryPoint = "idevice_new", CallingConvention = CallingConvention.Cdecl)]
-        public static extern iDeviceError NewDevice(out IntPtr iDevice, string udid);
+        public static extern iDeviceError NewDevice(out IntPtr devicePtr, string udid);
 
         [DllImport(LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
-        static extern iDeviceError idevice_get_device_list(out IntPtr devices, out IntPtr count);
+        static extern iDeviceError idevice_get_device_list(out IntPtr devicesPtr, out int count);
 
         [DllImport(LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
-        static extern iDeviceError idevice_get_udid(IntPtr device, out string udid);
+        static extern iDeviceError idevice_get_udid(IntPtr devicePtr, out string udid);
         #endregion
 
-        public static iDeviceError GetDeviceList(out List<IDevice> deviceList)
+        public static iDeviceError GetDeviceList(out List<iDevice> deviceList)
         {
-            List<IDevice> devices = new List<IDevice>();
+            List<iDevice> devices = new List<iDevice>();
             IntPtr devicesPtr;
-            iDeviceError returnCode = SearchForDevices(out devices, out devicesPtr);
+            iDeviceError returnCode = searchForDevices(out devices, out devicesPtr);
 
-            devices = devices.Where(x => devices.Skip(devices.IndexOf(x) + 1).Count(y => y.Udid == x.Udid) == 0).ToList();
+            deviceList = new List<iDevice>();
+            if (returnCode != iDeviceError.IDEVICE_E_SUCCESS)
+            {
+                return returnCode;
+            }
 
-            deviceList = new List<IDevice>();
-            foreach (IDevice currDevice in devices)
+            foreach (iDevice currDevice in devices)
             {
                 IntPtr lockdownService;
                 IntPtr lockdownClient;
                 Lockdown.LockdownError lockdownReturnCode = Lockdown.Start(currDevice.Handle, out lockdownClient, out lockdownService);
 
+                if (lockdownReturnCode != Lockdown.LockdownError.LOCKDOWN_E_SUCCESS)
+                {
+                    idevice_free(currDevice.Handle);
+                    continue;
+                }
+
                 XDocument deviceProperties;
                 lockdownReturnCode = Lockdown.GetProperties(lockdownClient, out deviceProperties);
 
+                if (lockdownReturnCode != Lockdown.LockdownError.LOCKDOWN_E_SUCCESS || deviceProperties == default(XDocument))
+                {
+                    lockdownReturnCode = Lockdown.FreeService(lockdownService);
+                    lockdownReturnCode = Lockdown.FreeClient(lockdownClient);
+                    idevice_free(currDevice.Handle);
+                    continue;
+                }
+
                 IEnumerable<XElement> keys = deviceProperties.Descendants("dict").Descendants("key");
-                deviceList.Add(new IDevice(
+                deviceList.Add(new iDevice(
                     IntPtr.Zero,
                     keys.Where(x => x.Value == "UniqueDeviceID").Select(x => (x.NextNode as XElement).Value).FirstOrDefault(),
                     keys.Where(x => x.Value == "SerialNumber").Select(x => (x.NextNode as XElement).Value).FirstOrDefault(),
@@ -65,34 +82,44 @@ namespace CycriptGUI.LibIMobileDevice
                     keys.Where(x => x.Value == "ProductType").Select(x => (x.NextNode as XElement).Value).FirstOrDefault()
                     ));
 
-                // Freeing
-                lockdownReturnCode = Lockdown.FreeService(lockdownService);
-                lockdownReturnCode = Lockdown.FreeClient(lockdownClient);
-                returnCode = FreeDevice(currDevice.Handle);
+                Lockdown.FreeService(lockdownService);
+                Lockdown.FreeClient(lockdownClient);
+                idevice_free(currDevice.Handle);
             }
 
             return returnCode;
         }
 
-        public static iDeviceError SearchForDevices(out List<IDevice> devices, out IntPtr devicesPtr)
+        static iDeviceError searchForDevices(out List<iDevice> devices, out IntPtr devicesPtr)
         {
-            IntPtr countPtr;
-            iDeviceError returnCode = idevice_get_device_list(out devicesPtr, out countPtr);
+            int count;
+            iDeviceError returnCode = idevice_get_device_list(out devicesPtr, out count);
 
-            devices = new List<IDevice>();
+            devices = new List<iDevice>();
+            if (returnCode != iDeviceError.IDEVICE_E_SUCCESS)
+            {
+                return returnCode;
+            }
+
+            else if (devicesPtr == IntPtr.Zero)
+            {
+                return iDeviceError.IDEVICE_E_UNKNOWN_ERROR;
+            }
+
             if (Marshal.ReadInt32(devicesPtr) != 0)
             {
                 string currUdid;
                 int i = 0;
-                while ((currUdid = Marshal.PtrToStringAnsi(Marshal.ReadIntPtr(devicesPtr, i))) != null)
+                while ((currUdid = Marshal.PtrToStringAnsi(Marshal.ReadIntPtr(devicesPtr, i))) != null
+                    && devices.Count(x => x.Udid == currUdid) == 0)
                 {
                     IntPtr currDevice;
                     returnCode = NewDevice(out currDevice, currUdid);
-                    devices.Add(new IDevice(currDevice, currUdid));
+                    devices.Add(new iDevice(currDevice, currUdid));
                     i = i + 4;
                 }
 
-                FreeDevices(devicesPtr);
+                idevice_device_list_free(devicesPtr);
             }
 
             return returnCode;
@@ -108,16 +135,27 @@ namespace CycriptGUI.LibIMobileDevice
             Marshal.Copy(xmlPtr, resultBytes, 0, length);
 
             string resultString = Encoding.UTF8.GetString(resultBytes);
-            return XDocument.Parse(resultString);
+            XDocument resultXml;
+            try
+            {
+                resultXml = XDocument.Parse(resultString);
+            }
+
+            catch
+            {
+                resultXml = new XDocument();
+            }
+
+            return resultXml;
         }
 
         // Free Devices
         #region Dll Imports
-        [DllImport(LibimobiledeviceDllPath, EntryPoint = "idevice_device_list_free", CallingConvention = CallingConvention.Cdecl)]
-        public static extern iDeviceError FreeDevices(IntPtr devices);
+        [DllImport(LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
+        static extern iDeviceError idevice_device_list_free(IntPtr devicesPtr);
 
-        [DllImport(LibimobiledeviceDllPath, EntryPoint = "idevice_free", CallingConvention = CallingConvention.Cdecl)]
-        public static extern iDeviceError FreeDevice(IntPtr device);
+        [DllImport(LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
+        static extern iDeviceError idevice_free(IntPtr devicePtr);
         #endregion
     }
 }

@@ -2,7 +2,7 @@
 
 namespace CycriptGUI.MainProgram
 {
-    class IOsProcess
+    class iOSProcess
     {
         public string User;
         public int ProcessID;
@@ -16,7 +16,7 @@ namespace CycriptGUI.MainProgram
         public TimeSpan CpuTime;
         public string Command;
 
-        public IOsProcess(string User, int ProcessID, double CpuUsage, double MemoryUsage, int VirtualMemoryUsage, int ResidentSetSize, string TTY, string State, DateTime StartTime, TimeSpan CpuTime, string Command)
+        public iOSProcess(string User, int ProcessID, double CpuUsage, double MemoryUsage, int VirtualMemoryUsage, int ResidentSetSize, string TTY, string State, DateTime StartTime, TimeSpan CpuTime, string Command)
         {
             this.User = User;
             this.ProcessID = ProcessID;

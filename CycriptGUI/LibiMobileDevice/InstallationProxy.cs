@@ -81,80 +81,87 @@ namespace CycriptGUI.LibIMobileDevice
         }
 
         // Connect
-        [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
-        static extern InstproxyError instproxy_client_new(IntPtr device, IntPtr lockdownService, out IntPtr client);
-
-        public static InstproxyError Connect(IntPtr device, IntPtr lockdownService, out IntPtr client)
-        {
-            InstproxyError returnCode = instproxy_client_new(device, lockdownService, out client);
-            return returnCode;
-        }
+        #region DllImports
+        [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, EntryPoint = "instproxy_client_new", CallingConvention = CallingConvention.Cdecl)]
+        public static extern InstproxyError Connect(IntPtr devicePtr, IntPtr lockdownService, out IntPtr instProxyClient);
+        #endregion
 
         // Working With Installation Proxy
         #region DllImports
         [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
-        static extern InstproxyError instproxy_browse(IntPtr client, IntPtr clientOptions, out IntPtr result);
-
-        [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
-        static extern InstproxyError instproxy_status_get_percent_complete(IntPtr status, out int percent);
+        static extern InstproxyError instproxy_browse(IntPtr instProxyClient, IntPtr clientOptions, out IntPtr result);
 
         [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
         static extern IntPtr instproxy_client_options_new();
 
         [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
-        static extern void instproxy_client_options_add(IntPtr clientOptionsList, string key, string value, IntPtr zero);
+        static extern void instproxy_client_options_add(IntPtr clientOptions, string key, string value, IntPtr zero);
         #endregion
 
-        public static InstproxyError GetApplications(IntPtr installationProxyClient, selectApp selectForm, out List<IOsApplication> appList)
+        public static InstproxyError GetApplications(IntPtr installProxyClient, selectApp selectForm, out List<iOSApplication> appList)
         {
-            IntPtr clientOptionsList = instproxy_client_options_new();
-            instproxy_client_options_add(clientOptionsList, "ApplicationType", "Any", IntPtr.Zero);
+            IntPtr clientOptions = instproxy_client_options_new();
+            instproxy_client_options_add(clientOptions, "ApplicationType", "Any", IntPtr.Zero);
 
-            selectForm.BeginInvoke(new MethodInvoker(delegate() { selectForm.loadingBar.PerformStep(); }));
+            selectForm.BeginInvoke(new MethodInvoker(delegate () { selectForm.loadingBar.PerformStep(); }));
 
             IntPtr resultPlist;
-            InstproxyError returnCode = instproxy_browse(installationProxyClient, clientOptionsList, out resultPlist);
-
-            selectForm.BeginInvoke(new MethodInvoker(delegate() { selectForm.loadingBar.PerformStep(); }));
+            InstproxyError returnCode = instproxy_browse(installProxyClient, clientOptions, out resultPlist);
+            instproxy_client_options_free(clientOptions);
 
             XDocument resultXml = LibiMobileDevice.PlistToXml(resultPlist);
+            appList = new List<iOSApplication>();
+            if (returnCode != InstproxyError.INSTPROXY_E_SUCCESS)
+            {
+                return returnCode;
+            }
+
+            else if (resultPlist == IntPtr.Zero || resultXml == default(XDocument))
+            {
+                return InstproxyError.INSTPROXY_E_UNKNOWN_ERROR;
+            }
+
+            selectForm.BeginInvoke(new MethodInvoker(delegate () { selectForm.loadingBar.PerformStep(); }));
+
             List<XElement> appElementList = resultXml.Descendants("dict").Where(x => x.Parent.Parent.Name == "plist").ToList();
-            appList = new List<IOsApplication>();
+            appList = new List<iOSApplication>();
             foreach (XElement currElement in appElementList)
             {
-                string version = currElement.Descendants("key").Where(x => x.Value == "CFBundleShortVersionString")
-                    .Select(x => (x.NextNode as XElement).Value).FirstOrDefault();
-
+                string version = getAttribute(currElement, "CFBundleShortVersionString");
                 if (version == null || version == "")
                 {
-                    version = currElement.Descendants("key").Where(x => x.Value == "CFBundleVersion")
-                        .Select(x => (x.NextNode as XElement).Value).FirstOrDefault();
+                    version = getAttribute(currElement, "CFBundleVersion");
                 }
 
-                string name = currElement.Descendants("key").Where(x => x.Value == "CFBundleName")
-                    .Select(x => (x.NextNode as XElement).Value).FirstOrDefault();
-                string executableName = currElement.Descendants("key").Where(x => x.Value == "CFBundleExecutable")
-                    .Select(x => (x.NextNode as XElement).Value).FirstOrDefault();
-
+                string name = getAttribute(currElement, "CFBundleName");
+                string executableName = getAttribute(currElement, "CFBundleExecutable");
                 if (name == null || name == "")
                 {
                     name = executableName;
                 }
 
-                string type = currElement.Descendants("key").Where(x => x.Value == "ApplicationType")
-                    .Select(x => (x.NextNode as XElement).Value).FirstOrDefault();
+                string type = getAttribute(currElement, "ApplicationType");
+                string identifier = getAttribute(currElement, "CFBundleIdentifier");
 
-                IOsApplication newApp = new IOsApplication(type, name, version,
-                    currElement.Descendants("key").Where(x => x.Value == "CFBundleIdentifier").Select(x => (x.NextNode as XElement).Value).FirstOrDefault(),
-                    executableName);
+                iOSApplication newApp = new iOSApplication(type, name, version, identifier, executableName);
                 appList.Add(newApp);
             }
 
             return returnCode;
         }
 
+        static string getAttribute(XElement rootElement, string key)
+        {
+            return rootElement.Descendants("key").Where(x => x.Value == key).Select(x => (x.NextNode as XElement).Value).FirstOrDefault();
+        }
+
         // Free
+        #region DllImports
         [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
-        public static extern InstproxyError instproxy_client_free(IntPtr client);
+        static extern InstproxyError instproxy_client_free(IntPtr instProxyClient);
+
+        [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
+        static extern InstproxyError instproxy_client_options_free(IntPtr clientOptions);
+        #endregion
     }
 }

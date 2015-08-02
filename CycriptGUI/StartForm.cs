@@ -7,18 +7,15 @@ using System.Windows.Forms;
 using System.Linq;
 using System.Drawing;
 
- namespace CycriptGUI
+namespace CycriptGUI
 {
     public partial class StartForm : Form
     {
         #region Global Variables
-        public static IDevice WorkingDevice;
+        public static iDevice WorkingDevice;
 
-        //public static string userName;
-        //public static string password;
-
-        List<IDevice> Devices = new List<IDevice>();
-        List<IDevice> listedDevices = new List<IDevice>();
+        List<iDevice> Devices = new List<iDevice>();
+        List<iDevice> listedDevices = new List<iDevice>();
         string selectedUdid;
         Task updateTask;
         #endregion
@@ -41,8 +38,8 @@ You need an Apple device running jaibroken iOs with the following packages insta
 
         private void StartForm_Shown(object sender, EventArgs e)
         {
-                selectDeviceBox.SelectedIndex = 0;
-                updateTask = Task.Factory.StartNew(() => { updateDeviceList(); });
+            selectDeviceBox.SelectedIndex = 0;
+            updateTask = Task.Factory.StartNew(() => { updateDeviceList(); });
         }
         #endregion
 
@@ -64,12 +61,12 @@ You need an Apple device running jaibroken iOs with the following packages insta
 
             else
             {
-                MessageBox.Show("Couldn't find any iOs device. Please check the connection and try again!", "No device detected",
+                MessageBox.Show("Couldn't find any iOS device. Please check the connection and try again!", "No device detected",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            // If sverything's OK, connectiong to the device
+            // If sverything's OK, connecting to the device
             LibiMobileDevice.iDeviceError deviceReturnCode = LibiMobileDevice.NewDevice(out WorkingDevice.Handle, WorkingDevice.Udid);
 
             Lockdown.LockdownError lockdownReturnCode = Lockdown.Start(
@@ -81,9 +78,6 @@ You need an Apple device running jaibroken iOs with the following packages insta
                 WorkingDevice.Handle,
                 WorkingDevice.InstallationProxyService,
                 out WorkingDevice.InstallationProxyClient);
-
-            //userName = userNameBox.Text;
-            //password = passwordBox.Text;
 
             // Setting up and starting app selection form
             Form selectAppForm = new selectApp() { Owner = this };
@@ -102,7 +96,6 @@ You need an Apple device running jaibroken iOs with the following packages insta
 
         private void refreshButton_Click(object sender, EventArgs e)
         {
-            refreshButton.Enabled = false;
             Task updateTask = Task.Factory.StartNew(() => { updateDeviceList(); });
         }
 
@@ -115,14 +108,16 @@ You need an Apple device running jaibroken iOs with the following packages insta
         #region Update Device List Functions
         void updateDeviceList()
         {
-            List<IDevice> deviceList;
+            BeginInvoke(new MethodInvoker(delegate { refreshButton.Enabled = false; }));
+
+            List<iDevice> deviceList;
             LibiMobileDevice.iDeviceError getDeviceReturnCode = LibiMobileDevice.GetDeviceList(out deviceList);
 
             // Setting found devices "Connected" property to "true", and the others' to "false"
-            foreach (IDevice currDevice in Devices)
+            foreach (iDevice currDevice in Devices)
             {
                 currDevice.Connected = false;
-                foreach (IDevice currDevice2 in deviceList)
+                foreach (iDevice currDevice2 in deviceList)
                 {
                     if (currDevice.Udid == currDevice2.Udid)
                     {
@@ -132,7 +127,7 @@ You need an Apple device running jaibroken iOs with the following packages insta
             }
 
             // Adding new devices to the list
-            List<IDevice> noDuplicatesList = deviceList.Where(x => Devices.Where(y => y.Udid == x.Udid).Count() == 0).ToList();
+            List<iDevice> noDuplicatesList = deviceList.Where(x => Devices.Where(y => y.Udid == x.Udid).Count() == 0).ToList();
             if (noDuplicatesList != null)
             {
                 Devices.AddRange(noDuplicatesList);
@@ -150,8 +145,8 @@ You need an Apple device running jaibroken iOs with the following packages insta
             selectDeviceBox.Items.Clear();
             if (Devices.Count != 0)
             {
-                listedDevices = new List<IDevice>();
-                foreach (IDevice currDevice in Devices)
+                listedDevices = new List<iDevice>();
+                foreach (iDevice currDevice in Devices)
                 {
                     // If device is connected, adding it to the combo box and setting its "index" property to its index in the combo box.
                     if (currDevice.Connected == true)

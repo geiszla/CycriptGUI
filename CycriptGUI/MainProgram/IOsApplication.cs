@@ -1,6 +1,6 @@
 ﻿namespace CycriptGUI.MainProgram
 {
-    public class IOsApplication
+    public class iOSApplication
     {
         public string Type;
         public string Name;
@@ -8,7 +8,7 @@
         public string Identifier;
         public string ExecutableName;
 
-        public IOsApplication(string type, string name, string version, string identifier, string executableName)
+        public iOSApplication(string type, string name, string version, string identifier, string executableName)
         {
             this.Type = type;
             this.Name = name;
