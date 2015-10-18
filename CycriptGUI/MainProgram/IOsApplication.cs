@@ -10,11 +10,11 @@
 
         public iOSApplication(string type, string name, string version, string identifier, string executableName)
         {
-            this.Type = type;
-            this.Name = name;
-            this.Version = version;
-            this.Identifier = identifier;
-            this.ExecutableName = executableName;
+            Type = type;
+            Name = name;
+            Version = version;
+            Identifier = identifier;
+            ExecutableName = executableName;
         }
     }
 }

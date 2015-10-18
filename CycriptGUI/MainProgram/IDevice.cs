@@ -79,20 +79,20 @@ namespace CycriptGUI.MainProgram
 
         public iDevice(IntPtr handle, string udid)
         {
-            this.Connected = true;
-            this.Handle = handle;
-            this.Udid = udid;
+            Connected = true;
+            Handle = handle;
+            Udid = udid;
         }
 
         public iDevice(IntPtr handle, string udid, string serialNumber, string name, string productType)
         {
-            this.Connected = true;
-            this.Handle = handle;
-            this.Udid = udid;
-            this.SerialNumber = serialNumber;
-            this.Name = name;
-            this.ProductType = productType;
-            this.ProductName = DeviceHardware[productType];
+            Connected = true;
+            Handle = handle;
+            Udid = udid;
+            SerialNumber = serialNumber;
+            Name = name;
+            ProductType = productType;
+            ProductName = DeviceHardware[productType];
         }
     }
 }
