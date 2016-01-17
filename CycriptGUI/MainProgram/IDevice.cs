@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CycriptGUI.LibIMobileDevice;
+using System;
 using System.Collections.Generic;
 
 namespace CycriptGUI.MainProgram
@@ -71,7 +72,7 @@ namespace CycriptGUI.MainProgram
             { "AppleTV5,3", "Apple TV 4G" }
         };
         #endregion
-        
+
         public string SerialNumber;
         public string Name;
         public string ProductType;

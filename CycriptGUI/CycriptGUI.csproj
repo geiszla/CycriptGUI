@@ -87,11 +87,11 @@
     <Compile Include="MainProgram\iOSApplication.cs" />
     <Compile Include="MainProgram\ResultDevice.cs" />
     <Compile Include="MainProgram\Ssh.cs" />
-    <Compile Include="SelectApp.cs">
+    <Compile Include="SelectForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="SelectApp.Designer.cs">
-      <DependentUpon>SelectApp.cs</DependentUpon>
+    <Compile Include="SelectForm.Designer.cs">
+      <DependentUpon>SelectForm.cs</DependentUpon>
     </Compile>
     <Compile Include="StartForm.cs">
       <SubType>Form</SubType>
@@ -104,8 +104,8 @@
     <EmbeddedResource Include="LoadingForm.resx">
       <DependentUpon>LoadingForm.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="SelectApp.resx">
-      <DependentUpon>SelectApp.cs</DependentUpon>
+    <EmbeddedResource Include="SelectForm.resx">
+      <DependentUpon>SelectForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="StartForm.resx">
       <DependentUpon>StartForm.cs</DependentUpon>

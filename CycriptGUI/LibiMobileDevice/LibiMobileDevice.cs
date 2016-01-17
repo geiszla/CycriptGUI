@@ -150,7 +150,7 @@ namespace CycriptGUI.LibIMobileDevice
             return resultXml;
         }
 
-        // Free Devices
+        // Free Device
         #region Dll Imports
         [DllImport(LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
         static extern iDeviceError idevice_device_list_free(IntPtr devicesPtr);
@@ -158,5 +158,14 @@ namespace CycriptGUI.LibIMobileDevice
         [DllImport(LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
         static extern iDeviceError idevice_free(IntPtr devicePtr);
         #endregion
+
+        public static void FreeDevice(iDevice device)
+        {
+            Lockdown.FreeClient(device.LockdownClient);
+            device.LockdownClient = IntPtr.Zero;
+
+            idevice_free(device.Handle);
+            device.Handle = IntPtr.Zero;
+        }
     }
 }

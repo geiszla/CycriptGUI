@@ -10,19 +10,36 @@ using System.Windows.Forms;
 
 namespace CycriptGUI
 {
-    public partial class SelectApp : Form
+    public partial class SelectForm : Form
     {
         static CancellationTokenSource cancellationTokenSource;
         public List<iOSApplication> AppList;
 
-        public SelectApp()
+        public SelectForm()
         {
             InitializeComponent();
         }
 
-        private void SelectApp_Shown(object sender, EventArgs e)
+        private void SelectForm_Load(object sender, EventArgs e)
+        {
+            iDevice workingDevice = StartForm.WorkingDevice;
+            LibiMobileDevice.iDeviceError deviceReturnCode = LibiMobileDevice.NewDevice(out workingDevice.Handle, workingDevice.Udid);
+
+            Lockdown.LockdownError lockdownReturnCode = Lockdown.Start(
+                workingDevice.Handle,
+                out workingDevice.LockdownClient,
+                out workingDevice.InstallationProxyService);
+
+            InstallationProxy.InstproxyError installProxyReturnCode = InstallationProxy.Connect(
+                workingDevice.Handle,
+                workingDevice.InstallationProxyService,
+                out workingDevice.InstallationProxyClient);
+        }
+
+        private void SelectForm_Shown(object sender, EventArgs e)
         {
             searchInSelect.SelectedIndex = 0;
+
             cancellationTokenSource = new CancellationTokenSource();
             Task getApplicationsTask = Task.Factory.StartNew(() => { updateAppList(); }, cancellationTokenSource.Token);
         }
@@ -30,15 +47,12 @@ namespace CycriptGUI
         #region Other Events
         private void searchBox_TextChanged(object sender, EventArgs e)
         {
-            applySelectAppLayout();
+            applyAppSelectLayout();
         }
 
         private void searchInSelect_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (AppList != null)
-            {
-                applySelectAppLayout();
-            }          
+            if (AppList != null) applyAppSelectLayout();
         }
 
         private void refreshButton_Click(object sender, EventArgs e)
@@ -51,12 +65,21 @@ namespace CycriptGUI
 
         private void cancelButton_Click(object sender, EventArgs e)
         {
-            this.Close();
+            Close();
         }
 
-        private void selectApp_FormClosing(object sender, FormClosingEventArgs e)
+        private void selectForm_FormClosing(object sender, FormClosingEventArgs e)
         {
             cancellationTokenSource.Cancel();
+            iDevice workingDevice = StartForm.WorkingDevice;
+
+            InstallationProxy.FreeClient(workingDevice.InstallationProxyClient);
+            workingDevice.InstallationProxyClient = IntPtr.Zero;
+
+            Lockdown.FreeService(workingDevice.InstallationProxyService);
+            workingDevice.InstallationProxyService = IntPtr.Zero;
+
+            LibiMobileDevice.FreeDevice(StartForm.WorkingDevice);
         }
         #endregion
 
@@ -78,7 +101,7 @@ namespace CycriptGUI
             return newTable;
         }
 
-        void applySelectAppLayout()
+        void applyAppSelectLayout()
         {
             // Applying layout after application list update
             loadingLabel.Visible = false;
@@ -115,7 +138,7 @@ namespace CycriptGUI
         void updateAppList()
         {
             // Changing layout for updating
-            BeginInvoke(new MethodInvoker(delegate()
+            BeginInvoke(new MethodInvoker(delegate ()
             {
                 loadingBar.Value = 0;
                 loadingBar.PerformStep();
@@ -131,12 +154,12 @@ namespace CycriptGUI
             // Changing layout after updating
             if (InvokeRequired)
             {
-                BeginInvoke(new MethodInvoker(applySelectAppLayout));
+                BeginInvoke(new MethodInvoker(applyAppSelectLayout));
             }
 
             else
             {
-                applySelectAppLayout();
+                applyAppSelectLayout();
             }
         }
         #endregion

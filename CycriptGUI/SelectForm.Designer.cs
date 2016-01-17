@@ -2,7 +2,7 @@
 
 namespace CycriptGUI
 {
-    partial class SelectApp
+    partial class SelectForm
     {
         /// <summary>
         /// Required designer variable.
@@ -164,7 +164,7 @@ namespace CycriptGUI
             this.refreshButton.Visible = false;
             this.refreshButton.Click += new System.EventHandler(this.refreshButton_Click);
             // 
-            // selectApp
+            // SelectForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
@@ -181,11 +181,12 @@ namespace CycriptGUI
             this.Controls.Add(this.resultsTable);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
-            this.Name = "selectApp";
+            this.Name = "SelectForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
             this.Text = "Select Application";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.selectApp_FormClosing);
-            this.Shown += new System.EventHandler(this.SelectApp_Shown);
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.selectForm_FormClosing);
+            this.Load += new System.EventHandler(this.SelectForm_Load);
+            this.Shown += new System.EventHandler(this.SelectForm_Shown);
             ((System.ComponentModel.ISupportInitialize)(this.resultsTable)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();

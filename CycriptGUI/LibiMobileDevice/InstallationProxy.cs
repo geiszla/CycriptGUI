@@ -98,7 +98,7 @@ namespace CycriptGUI.LibIMobileDevice
         static extern void instproxy_client_options_add(IntPtr clientOptions, string key, string value, IntPtr zero);
         #endregion
 
-        public static InstproxyError GetApplications(IntPtr installProxyClient, SelectApp selectForm, out List<iOSApplication> appList)
+        public static InstproxyError GetApplications(IntPtr installProxyClient, SelectForm selectForm, out List<iOSApplication> appList)
         {
             IntPtr clientOptions = instproxy_client_options_new();
             instproxy_client_options_add(clientOptions, "ApplicationType", "Any", IntPtr.Zero);
@@ -151,8 +151,8 @@ namespace CycriptGUI.LibIMobileDevice
 
         // Free
         #region DllImports
-        [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
-        static extern InstproxyError instproxy_client_free(IntPtr instProxyClient);
+        [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, EntryPoint = "instproxy_client_free", CallingConvention = CallingConvention.Cdecl)]
+        public static extern InstproxyError FreeClient(IntPtr instProxyClient);
 
         [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
         static extern InstproxyError instproxy_client_options_free(IntPtr clientOptions);

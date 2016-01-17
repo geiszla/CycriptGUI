@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CycriptGUI.MainProgram;
+using System;
 using System.Runtime.InteropServices;
 using System.Xml.Linq;
 

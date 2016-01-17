@@ -8,7 +8,8 @@ namespace CycriptGUI.MainProgram
     {
         public static void Connect(string udid)
         {
-            Process usbTunnel = new Process {
+            Process usbTunnel = new Process
+            {
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "iproxy.exe",

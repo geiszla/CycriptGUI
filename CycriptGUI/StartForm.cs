@@ -2,10 +2,10 @@
 using CycriptGUI.MainProgram;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Linq;
-using System.Drawing;
 
 namespace CycriptGUI
 {
@@ -16,7 +16,6 @@ namespace CycriptGUI
 
         List<iDevice> Devices = new List<iDevice>();
         List<iDevice> listedDevices = new List<iDevice>();
-        string selectedUdid;
         Task updateTask;
         #endregion
 
@@ -39,14 +38,14 @@ You need an Apple device running jaibroken iOs with the following packages insta
         private void StartForm_Shown(object sender, EventArgs e)
         {
             selectDeviceBox.SelectedIndex = 0;
-            updateTask = Task.Factory.StartNew(() => { updateDeviceList(); });
+            updateTask = Task.Factory.StartNew(() => { refreshDeviceList(); });
         }
         #endregion
 
         #region Other Events
         private void connectButton_Click(object sender, EventArgs e)
         {
-            // Handling exceptional cases
+            // Handle exceptional cases
             if (listedDevices != null && listedDevices.Count != 0)
             {
                 WorkingDevice = Devices.Where(x => x.IsConnected == true).ToList()[selectDeviceBox.SelectedIndex];
@@ -66,37 +65,24 @@ You need an Apple device running jaibroken iOs with the following packages insta
                 return;
             }
 
-            // If sverything's OK, connecting to the device
-            LibiMobileDevice.iDeviceError deviceReturnCode = LibiMobileDevice.NewDevice(out WorkingDevice.Handle, WorkingDevice.Udid);
-
-            Lockdown.LockdownError lockdownReturnCode = Lockdown.Start(
-                WorkingDevice.Handle,
-                out WorkingDevice.LockdownClient,
-                out WorkingDevice.InstallationProxyService);
-
-            InstallationProxy.InstproxyError installProxyReturnCode = InstallationProxy.Connect(
-                WorkingDevice.Handle,
-                WorkingDevice.InstallationProxyService,
-                out WorkingDevice.InstallationProxyClient);
-
-            // Setting up and starting app selection form
-            Form selectAppForm = new SelectApp() { Owner = this };
+            // If everything's OK, set up and start app selection form
+            Form selectAppForm = new SelectForm() { Owner = this };
             selectAppForm.Location = new Point(
-                this.Location.X + (this.Width - selectAppForm.Width) / 2,
-                this.Location.Y + (this.Height - selectAppForm.Height) / 2);
+                Location.X + (Width - selectAppForm.Width) / 2,
+                Location.Y + (Height - selectAppForm.Height) / 2);
             selectAppForm.FormClosing += (s, args) =>
-                this.Location = new Point(
-                    selectAppForm.Location.X + (selectAppForm.Width - this.Width) / 2,
-                    selectAppForm.Location.Y + (selectAppForm.Height - this.Height) / 2);
-            selectAppForm.Closed += (s, args) => this.Show();
+                Location = new Point(
+                    selectAppForm.Location.X + (selectAppForm.Width - Width) / 2,
+                    selectAppForm.Location.Y + (selectAppForm.Height - Height) / 2);
+            selectAppForm.Closed += (s, args) => Show();
 
-            this.Hide();
+            Hide();
             selectAppForm.Show();
         }
 
         private void refreshButton_Click(object sender, EventArgs e)
         {
-            Task updateTask = Task.Factory.StartNew(() => { updateDeviceList(); });
+            Task updateTask = Task.Factory.StartNew(() => { refreshDeviceList(); });
         }
 
         private void manageButton_Click(object sender, EventArgs e)
@@ -106,91 +92,93 @@ You need an Apple device running jaibroken iOs with the following packages insta
         #endregion
 
         #region Update Device List Functions
-        void updateDeviceList()
+        void refreshDeviceList()
         {
-            BeginInvoke(new MethodInvoker(delegate { refreshButton.Enabled = false; }));
+            BeginInvoke(new MethodInvoker(delegate { initializeOrFinalizeRefresh(true); }));
 
+            // Get new devices and remove duplicates
             List<iDevice> deviceList;
-            LibiMobileDevice.iDeviceError getDeviceReturnCode = LibiMobileDevice.GetDeviceList(out deviceList);
+            LibiMobileDevice.GetDeviceList(out deviceList);
+            deviceList = deviceList.GroupBy(x => x.Udid).Select(x => x.First()).ToList();
 
-            // Setting found devices "Connected" property to "true", and the others' to "false"
+            // If the list haven't changed finalize refresh
+            if (deviceList.Join(listedDevices, x => x.Udid, y => y.Udid, (x, y) => x).Count() == deviceList.Count)
+            {
+                BeginInvoke(new MethodInvoker(delegate { initializeOrFinalizeRefresh(false); }));
+                return;
+            }
+
+            // Set found devices "IsConnected" property to "true", and the others' to "false"
             foreach (iDevice currDevice in Devices)
             {
                 currDevice.IsConnected = false;
                 foreach (iDevice currDevice2 in deviceList)
                 {
-                    if (currDevice.Udid == currDevice2.Udid)
-                    {
-                        currDevice.IsConnected = true;
-                    }
+                    if (currDevice.Udid == currDevice2.Udid) currDevice.IsConnected = true;
                 }
             }
 
-            // Adding new devices to the list
-            List<iDevice> noDuplicatesList = deviceList.Where(x => Devices.Where(y => y.Udid == x.Udid).Count() == 0).ToList();
-            if (noDuplicatesList != null)
-            {
-                Devices.AddRange(noDuplicatesList);
-            }
+            // Add new devices to the list
+            List<iDevice> newDevices = deviceList.Where(x => !Devices.Any(y => y.Udid == x.Udid)).ToList();
+            newDevices.ForEach(x => x.IsConnected = true);
+            Devices.AddRange(newDevices);
 
-            BeginInvoke(new MethodInvoker(applyDeviceList));
+            BeginInvoke(new MethodInvoker(() => { applyDeviceList(); initializeOrFinalizeRefresh(false); }));
         }
 
         void applyDeviceList()
         {
-            // Determining currently selected device
-            selectedUdid = listedDevices.Count() != 0 ? listedDevices[selectDeviceBox.SelectedIndex].Udid : null;
+            // Determine currently selected device
+            string selectedUdid = listedDevices.Count != 0 ? listedDevices[selectDeviceBox.SelectedIndex].Udid : null;
 
-            // Refreshing device combo box
+            // Clear combo box and if no devices connected, change its text to error message
             selectDeviceBox.Items.Clear();
-            if (Devices.Count != 0)
-            {
-                listedDevices = new List<iDevice>();
-                foreach (iDevice currDevice in Devices)
-                {
-                    // If device is connected, adding it to the combo box and setting its "index" property to its index in the combo box.
-                    if (currDevice.IsConnected == true)
-                    {
-                        string currItemString = currDevice.Name + " (" + currDevice.ProductName + ")";
-                        if (Devices.Where(x => x.Name == currDevice.Name).Count() > 1 && Devices.Where(x => x.ProductType == currDevice.ProductType).Count() > 1)
-                        {
-                            currItemString += " (" + currDevice.SerialNumber + ")";
-                        }
 
-                        selectDeviceBox.Items.Add(currItemString);
-                        listedDevices.Add(currDevice);
-                    }
-                }
-
-                if (listedDevices.Count() != 0)
-                {
-                    // If there was device selected before refresh, setting the currently selected index to its index
-                    if (selectedUdid != null)
-                    {
-                        int udidIndex = Devices.Where(x => x.IsConnected == true).ToList().IndexOf(Devices.Where(x => x.Udid == selectedUdid).FirstOrDefault());
-                        selectDeviceBox.SelectedIndex = udidIndex != -1 ? udidIndex : 0;
-                    }
-
-                    else
-                    {
-                        selectDeviceBox.SelectedIndex = 0;
-                    }
-
-                    manageButton.Enabled = true;
-                }
-            }
-
-            // If no devices connected, displaying message in combo box
-            if (Devices.Count() != 0 && listedDevices.Count() == 0 || Devices.Count() == 0)
+            List<iDevice> connectedDevices = Devices.Where(x => x.IsConnected).ToList();
+            if (connectedDevices.Count == 0)
             {
                 selectedUdid = null;
 
                 selectDeviceBox.Items.Add("No iDevice Has Been Detected...");
                 selectDeviceBox.SelectedIndex = 0;
                 manageButton.Enabled = false;
+
+                return;
             }
 
-            refreshButton.Enabled = true;
+            // Else refresh device combo box
+            listedDevices = connectedDevices;
+            foreach (iDevice currDevice in connectedDevices)
+            {
+                // Add devices to combo box
+                string currItemString = currDevice.Name + " (" + currDevice.ProductName + ")";
+
+                int sameNameCount = connectedDevices.Where(x => x.Name == currDevice.Name).Count();
+                int sameProductCount = connectedDevices.Where(x => x.ProductType == currDevice.ProductType).Count();
+                if (sameNameCount > 1 && sameProductCount > 1)
+                {
+                    currItemString += " (" + currDevice.SerialNumber + ")";
+                }
+
+                selectDeviceBox.Items.Add(currItemString);
+            }
+            
+            // If last selected index can't be determined, return
+            if (listedDevices.Count == 0 || selectedUdid == null)
+            {
+                selectDeviceBox.SelectedIndex = 0;
+                return;
+            }
+
+            // Else set the currently selected index to last selected index
+            int udidIndex = connectedDevices.IndexOf(connectedDevices.Where(x => x.Udid == selectedUdid).FirstOrDefault());
+            selectDeviceBox.SelectedIndex = udidIndex != -1 ? udidIndex : 0;
+        }
+
+        void initializeOrFinalizeRefresh(bool isInitialization)
+        {
+            refreshButton.Enabled = !isInitialization;
+            manageButton.Enabled = !isInitialization;
         }
         #endregion
 
@@ -198,6 +186,7 @@ You need an Apple device running jaibroken iOs with the following packages insta
         private const int WM_DEVICECHANGE = 0x0219;
         bool eventHappened = false;
         System.Timers.Timer newEventTimer;
+
         protected override void WndProc(ref Message m)
         {
             // Getting device change event and starting a new timer
@@ -236,7 +225,7 @@ You need an Apple device running jaibroken iOs with the following packages insta
             else
             {
                 newEventTimer.Stop();
-                updateDeviceList();
+                refreshDeviceList();
             }
         }
         #endregion
