@@ -81,9 +81,11 @@
     <Compile Include="LoadingForm.Designer.cs">
       <DependentUpon>LoadingForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="MainProgram\Device.cs" />
     <Compile Include="MainProgram\iDevice.cs" />
     <Compile Include="MainProgram\iOSProcess.cs" />
     <Compile Include="MainProgram\iOSApplication.cs" />
+    <Compile Include="MainProgram\ResultDevice.cs" />
     <Compile Include="MainProgram\Ssh.cs" />
     <Compile Include="SelectApp.cs">
       <SubType>Form</SubType>

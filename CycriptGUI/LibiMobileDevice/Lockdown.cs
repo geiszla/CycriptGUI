@@ -71,10 +71,7 @@ namespace CycriptGUI.LibIMobileDevice
             }
 
             returnCode = lockdownd_start_service(client, serviceIdentifier, out service);
-            if (service == IntPtr.Zero)
-            {
-                return LockdownError.LOCKDOWN_E_UNKNOWN_ERROR;
-            }
+            if (service == IntPtr.Zero) return LockdownError.LOCKDOWN_E_UNKNOWN_ERROR;
 
             return returnCode;
         }

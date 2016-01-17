@@ -98,12 +98,12 @@ namespace CycriptGUI.LibIMobileDevice
         static extern void instproxy_client_options_add(IntPtr clientOptions, string key, string value, IntPtr zero);
         #endregion
 
-        public static InstproxyError GetApplications(IntPtr installProxyClient, selectApp selectForm, out List<iOSApplication> appList)
+        public static InstproxyError GetApplications(IntPtr installProxyClient, SelectApp selectForm, out List<iOSApplication> appList)
         {
             IntPtr clientOptions = instproxy_client_options_new();
             instproxy_client_options_add(clientOptions, "ApplicationType", "Any", IntPtr.Zero);
 
-            selectForm.BeginInvoke(new MethodInvoker(delegate () { selectForm.loadingBar.PerformStep(); }));
+            selectForm.BeginInvoke(new MethodInvoker(() => { selectForm.loadingBar.PerformStep(); }));
 
             IntPtr resultPlist;
             InstproxyError returnCode = instproxy_browse(installProxyClient, clientOptions, out resultPlist);
@@ -121,24 +121,18 @@ namespace CycriptGUI.LibIMobileDevice
                 return InstproxyError.INSTPROXY_E_UNKNOWN_ERROR;
             }
 
-            selectForm.BeginInvoke(new MethodInvoker(delegate () { selectForm.loadingBar.PerformStep(); }));
+            selectForm.BeginInvoke(new MethodInvoker(() => { selectForm.loadingBar.PerformStep(); }));
 
             List<XElement> appElementList = resultXml.Descendants("dict").Where(x => x.Parent.Parent.Name == "plist").ToList();
             appList = new List<iOSApplication>();
             foreach (XElement currElement in appElementList)
             {
                 string version = getAttribute(currElement, "CFBundleShortVersionString");
-                if (version == null || version == "")
-                {
-                    version = getAttribute(currElement, "CFBundleVersion");
-                }
+                if (version == null || version == "") version = getAttribute(currElement, "CFBundleVersion");
 
                 string name = getAttribute(currElement, "CFBundleName");
                 string executableName = getAttribute(currElement, "CFBundleExecutable");
-                if (name == null || name == "")
-                {
-                    name = executableName;
-                }
+                if (name == null || name == "") name = executableName;
 
                 string type = getAttribute(currElement, "ApplicationType");
                 string identifier = getAttribute(currElement, "CFBundleIdentifier");

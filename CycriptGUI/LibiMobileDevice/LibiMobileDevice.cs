@@ -40,7 +40,7 @@ namespace CycriptGUI.LibIMobileDevice
 
         public static iDeviceError GetDeviceList(out List<iDevice> deviceList)
         {
-            List<iDevice> devices = new List<iDevice>();
+            List<ResultDevice> devices = new List<ResultDevice>();
             IntPtr devicesPtr;
             iDeviceError returnCode = searchForDevices(out devices, out devicesPtr);
 
@@ -50,7 +50,7 @@ namespace CycriptGUI.LibIMobileDevice
                 return returnCode;
             }
 
-            foreach (iDevice currDevice in devices)
+            foreach (ResultDevice currDevice in devices)
             {
                 IntPtr lockdownService;
                 IntPtr lockdownClient;
@@ -64,7 +64,6 @@ namespace CycriptGUI.LibIMobileDevice
 
                 XDocument deviceProperties;
                 lockdownReturnCode = Lockdown.GetProperties(lockdownClient, out deviceProperties);
-
                 if (lockdownReturnCode != Lockdown.LockdownError.LOCKDOWN_E_SUCCESS || deviceProperties == default(XDocument))
                 {
                     lockdownReturnCode = Lockdown.FreeService(lockdownService);
@@ -90,12 +89,12 @@ namespace CycriptGUI.LibIMobileDevice
             return returnCode;
         }
 
-        static iDeviceError searchForDevices(out List<iDevice> devices, out IntPtr devicesPtr)
+        static iDeviceError searchForDevices(out List<ResultDevice> devices, out IntPtr devicesPtr)
         {
             int count;
             iDeviceError returnCode = idevice_get_device_list(out devicesPtr, out count);
 
-            devices = new List<iDevice>();
+            devices = new List<ResultDevice>();
             if (returnCode != iDeviceError.IDEVICE_E_SUCCESS)
             {
                 return returnCode;
@@ -106,21 +105,23 @@ namespace CycriptGUI.LibIMobileDevice
                 return iDeviceError.IDEVICE_E_UNKNOWN_ERROR;
             }
 
-            if (Marshal.ReadInt32(devicesPtr) != 0)
+            else if (Marshal.ReadInt32(devicesPtr) == 0)
             {
-                string currUdid;
-                int i = 0;
-                while ((currUdid = Marshal.PtrToStringAnsi(Marshal.ReadIntPtr(devicesPtr, i))) != null
-                    && devices.Count(x => x.Udid == currUdid) == 0)
-                {
-                    IntPtr currDevice;
-                    returnCode = NewDevice(out currDevice, currUdid);
-                    devices.Add(new iDevice(currDevice, currUdid));
-                    i = i + 4;
-                }
-
-                idevice_device_list_free(devicesPtr);
+                return iDeviceError.IDEVICE_E_NO_DEVICE;
             }
+
+            string currUdid;
+            int i = 0;
+            while ((currUdid = Marshal.PtrToStringAnsi(Marshal.ReadIntPtr(devicesPtr, i))) != null
+                && devices.Count(x => x.Udid == currUdid) == 0)
+            {
+                IntPtr currDevice;
+                returnCode = NewDevice(out currDevice, currUdid);
+                devices.Add(new ResultDevice(currDevice, currUdid));
+                i = i + 4;
+            }
+
+            idevice_device_list_free(devicesPtr);
 
             return returnCode;
         }

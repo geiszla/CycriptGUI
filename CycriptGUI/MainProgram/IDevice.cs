@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace CycriptGUI.MainProgram
 {
-    public class iDevice
+    public class iDevice : Device
     {
         #region Device Hardware
         Dictionary<string, string> DeviceHardware = new Dictionary<string, string>()
@@ -23,6 +23,8 @@ namespace CycriptGUI.MainProgram
             { "iPhone6,2", "iPhone 5S" },
             { "iPhone7,1", "iPhone 6 Plus" },
             { "iPhone7,2", "iPhone 6" },
+            { "iPhone8,1", "iPhone 6S" },
+            { "iPhone8,2", "iPhone 6S Plus" },
 
             { "iPod1,1", "iPod Touch 1G" },
             { "iPod2,1", "iPod Touch 2G" },
@@ -57,36 +59,33 @@ namespace CycriptGUI.MainProgram
             { "iPad4,7", "iPad Mini 3" },
             { "iPad4,8", "iPad Mini 3" },
             { "iPad4,9", "iPad Mini 3" },
+            { "iPad5,1", "iPad Mini 4" },
+            { "iPad5,2", "iPad Mini 4" },
+
+            { "iPad6,7", "iPad Pro" },
+            { "iPad6,8", "iPad Pro" },
 
             { "AppleTV2,1", "Apple TV 2G" },
             { "AppleTV3,1", "Apple TV 3G" },
-            { "AppleTV3,2", "Apple TV 3G Rev A" }
+            { "AppleTV3,2", "Apple TV 3G Rev A" },
+            { "AppleTV5,3", "Apple TV 4G" }
         };
         #endregion
-
-        public bool Connected;
-
-        public IntPtr Handle;
-        public IntPtr LockdownClient;
-        public IntPtr InstallationProxyService;
-        public IntPtr InstallationProxyClient;
-
-        public string Udid;
+        
         public string SerialNumber;
         public string Name;
         public string ProductType;
         public string ProductName;
 
-        public iDevice(IntPtr handle, string udid)
-        {
-            Connected = true;
-            Handle = handle;
-            Udid = udid;
-        }
+        public IntPtr LockdownClient;
+        public IntPtr InstallationProxyService;
+        public IntPtr InstallationProxyClient;
+
+        public bool IsConnected;
 
         public iDevice(IntPtr handle, string udid, string serialNumber, string name, string productType)
         {
-            Connected = true;
+            IsConnected = true;
             Handle = handle;
             Udid = udid;
             SerialNumber = serialNumber;

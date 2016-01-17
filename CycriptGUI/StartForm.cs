@@ -49,7 +49,7 @@ You need an Apple device running jaibroken iOs with the following packages insta
             // Handling exceptional cases
             if (listedDevices != null && listedDevices.Count != 0)
             {
-                WorkingDevice = Devices.Where(x => x.Connected == true).ToList()[selectDeviceBox.SelectedIndex];
+                WorkingDevice = Devices.Where(x => x.IsConnected == true).ToList()[selectDeviceBox.SelectedIndex];
             }
 
             else if (!updateTask.IsCompleted)
@@ -80,7 +80,7 @@ You need an Apple device running jaibroken iOs with the following packages insta
                 out WorkingDevice.InstallationProxyClient);
 
             // Setting up and starting app selection form
-            Form selectAppForm = new selectApp() { Owner = this };
+            Form selectAppForm = new SelectApp() { Owner = this };
             selectAppForm.Location = new Point(
                 this.Location.X + (this.Width - selectAppForm.Width) / 2,
                 this.Location.Y + (this.Height - selectAppForm.Height) / 2);
@@ -116,12 +116,12 @@ You need an Apple device running jaibroken iOs with the following packages insta
             // Setting found devices "Connected" property to "true", and the others' to "false"
             foreach (iDevice currDevice in Devices)
             {
-                currDevice.Connected = false;
+                currDevice.IsConnected = false;
                 foreach (iDevice currDevice2 in deviceList)
                 {
                     if (currDevice.Udid == currDevice2.Udid)
                     {
-                        currDevice.Connected = true;
+                        currDevice.IsConnected = true;
                     }
                 }
             }
@@ -149,7 +149,7 @@ You need an Apple device running jaibroken iOs with the following packages insta
                 foreach (iDevice currDevice in Devices)
                 {
                     // If device is connected, adding it to the combo box and setting its "index" property to its index in the combo box.
-                    if (currDevice.Connected == true)
+                    if (currDevice.IsConnected == true)
                     {
                         string currItemString = currDevice.Name + " (" + currDevice.ProductName + ")";
                         if (Devices.Where(x => x.Name == currDevice.Name).Count() > 1 && Devices.Where(x => x.ProductType == currDevice.ProductType).Count() > 1)
@@ -167,7 +167,7 @@ You need an Apple device running jaibroken iOs with the following packages insta
                     // If there was device selected before refresh, setting the currently selected index to its index
                     if (selectedUdid != null)
                     {
-                        int udidIndex = Devices.Where(x => x.Connected == true).ToList().IndexOf(Devices.Where(x => x.Udid == selectedUdid).FirstOrDefault());
+                        int udidIndex = Devices.Where(x => x.IsConnected == true).ToList().IndexOf(Devices.Where(x => x.Udid == selectedUdid).FirstOrDefault());
                         selectDeviceBox.SelectedIndex = udidIndex != -1 ? udidIndex : 0;
                     }
 

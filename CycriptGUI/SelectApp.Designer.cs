@@ -2,7 +2,7 @@
 
 namespace CycriptGUI
 {
-    partial class selectApp
+    partial class SelectApp
     {
         /// <summary>
         /// Required designer variable.

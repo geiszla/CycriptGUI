@@ -10,12 +10,12 @@ using System.Windows.Forms;
 
 namespace CycriptGUI
 {
-    public partial class selectApp : Form
+    public partial class SelectApp : Form
     {
         static CancellationTokenSource cancellationTokenSource;
         public List<iOSApplication> AppList;
 
-        public selectApp()
+        public SelectApp()
         {
             InitializeComponent();
         }
