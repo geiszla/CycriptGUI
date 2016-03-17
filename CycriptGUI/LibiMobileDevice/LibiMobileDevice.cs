@@ -10,8 +10,8 @@ namespace CycriptGUI.LibIMobileDevice
 {
     class LibiMobileDevice
     {
-        public const string LibimobiledeviceDllPath = @"libimobiledevice.dll";
-        public const string LibplistDllPath = @"libplist.dll";
+        public const string LIBIMOBILEDEVICE_DLL_PATH = @"libimobiledevice.dll";
+        const string LIBPLIST_DLL_PATH = @"libplist.dll";
         public enum iDeviceError
         {
             IDEVICE_E_SUCCESS = 0,
@@ -25,19 +25,17 @@ namespace CycriptGUI.LibIMobileDevice
 
         // Get Devices
         #region DllImports
-        [DllImport(LibplistDllPath, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LIBPLIST_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
         static extern void plist_to_xml(IntPtr plist, out IntPtr xml, out int length);
 
-        [DllImport(LibimobiledeviceDllPath, EntryPoint = "idevice_new", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LIBIMOBILEDEVICE_DLL_PATH, EntryPoint = "idevice_new", CallingConvention = CallingConvention.Cdecl)]
         public static extern iDeviceError NewDevice(out IntPtr devicePtr, string udid);
 
-        [DllImport(LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LIBIMOBILEDEVICE_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
         static extern iDeviceError idevice_get_device_list(out IntPtr devicesPtr, out int count);
-
-        [DllImport(LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
-        static extern iDeviceError idevice_get_udid(IntPtr devicePtr, out string udid);
         #endregion
 
+        #region Main Functions
         public static iDeviceError GetDeviceList(out List<iDevice> deviceList)
         {
             List<ResultDevice> devices = new List<ResultDevice>();
@@ -79,7 +77,7 @@ namespace CycriptGUI.LibIMobileDevice
                     keys.Where(x => x.Value == "SerialNumber").Select(x => (x.NextNode as XElement).Value).FirstOrDefault(),
                     keys.Where(x => x.Value == "DeviceName").Select(x => (x.NextNode as XElement).Value).FirstOrDefault(),
                     keys.Where(x => x.Value == "ProductType").Select(x => (x.NextNode as XElement).Value).FirstOrDefault()
-                    ));
+                ));
 
                 Lockdown.FreeService(lockdownService);
                 Lockdown.FreeClient(lockdownClient);
@@ -122,10 +120,11 @@ namespace CycriptGUI.LibIMobileDevice
             }
 
             idevice_device_list_free(devicesPtr);
-
             return returnCode;
         }
+        #endregion
 
+        #region Other Functions
         public static XDocument PlistToXml(IntPtr plistPtr)
         {
             IntPtr xmlPtr;
@@ -149,13 +148,14 @@ namespace CycriptGUI.LibIMobileDevice
 
             return resultXml;
         }
+        #endregion
 
         // Free Device
         #region Dll Imports
-        [DllImport(LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LIBIMOBILEDEVICE_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
         static extern iDeviceError idevice_device_list_free(IntPtr devicesPtr);
 
-        [DllImport(LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LIBIMOBILEDEVICE_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
         static extern iDeviceError idevice_free(IntPtr devicePtr);
         #endregion
 

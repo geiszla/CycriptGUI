@@ -103,6 +103,7 @@
             this.loadButton.TabIndex = 9;
             this.loadButton.Text = "Load Session";
             this.loadButton.UseVisualStyleBackColor = true;
+            this.loadButton.Click += new System.EventHandler(this.loadButton_Click);
             // 
             // manageButton
             // 

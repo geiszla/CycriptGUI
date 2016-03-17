@@ -11,13 +11,11 @@ namespace CycriptGUI
 {
     public partial class StartForm : Form
     {
-        #region Global Variables
         public static iDevice WorkingDevice;
 
         List<iDevice> Devices = new List<iDevice>();
         List<iDevice> listedDevices = new List<iDevice>();
-        Task updateTask;
-        #endregion
+        Task UpdateTask;
 
         public StartForm()
         {
@@ -38,7 +36,7 @@ You need an Apple device running jaibroken iOs with the following packages insta
         private void StartForm_Shown(object sender, EventArgs e)
         {
             selectDeviceBox.SelectedIndex = 0;
-            updateTask = Task.Factory.StartNew(() => { refreshDeviceList(); });
+            UpdateTask = Task.Factory.StartNew(() => { refreshDeviceList(); });
         }
         #endregion
 
@@ -51,7 +49,7 @@ You need an Apple device running jaibroken iOs with the following packages insta
                 WorkingDevice = Devices.Where(x => x.IsConnected == true).ToList()[selectDeviceBox.SelectedIndex];
             }
 
-            else if (!updateTask.IsCompleted)
+            else if (!UpdateTask.IsCompleted)
             {
                 MessageBox.Show("Please wait, while the program finishes searching for devices!", "Search in progress",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -64,6 +62,9 @@ You need an Apple device running jaibroken iOs with the following packages insta
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
+
+            // Attempt to connect to Installation Proxy
+            if (!connectToInstallationProxy()) return;
 
             // If everything's OK, set up and start app selection form
             Form selectAppForm = new SelectForm() { Owner = this };
@@ -80,21 +81,27 @@ You need an Apple device running jaibroken iOs with the following packages insta
             selectAppForm.Show();
         }
 
+        private void loadButton_Click(object sender, EventArgs e)
+        {
+            showNotImplementedMessage();
+        }
+
         private void refreshButton_Click(object sender, EventArgs e)
         {
-            Task updateTask = Task.Factory.StartNew(() => { refreshDeviceList(); });
+            UpdateTask = Task.Factory.StartNew(() => { refreshDeviceList(); });
         }
 
         private void manageButton_Click(object sender, EventArgs e)
         {
-            Ssh.Connect(listedDevices[selectDeviceBox.SelectedIndex].Udid);
+            showNotImplementedMessage();
+            //Ssh.Connect(listedDevices[selectDeviceBox.SelectedIndex].Udid);
         }
         #endregion
 
         #region Update Device List Functions
         void refreshDeviceList()
         {
-            BeginInvoke(new MethodInvoker(delegate { initializeOrFinalizeRefresh(true); }));
+            initializeOrFinalizeRefresh(true, false);
 
             // Get new devices and remove duplicates
             List<iDevice> deviceList;
@@ -102,9 +109,10 @@ You need an Apple device running jaibroken iOs with the following packages insta
             deviceList = deviceList.GroupBy(x => x.Udid).Select(x => x.First()).ToList();
 
             // If the list haven't changed finalize refresh
-            if (deviceList.Join(listedDevices, x => x.Udid, y => y.Udid, (x, y) => x).Count() == deviceList.Count)
+            if (deviceList != null && deviceList.Count != 0 && listedDevices.Count == deviceList.Count &&
+                deviceList.Join(listedDevices, x => x.Udid, y => y.Udid, (x, y) => x).Count() == deviceList.Count)
             {
-                BeginInvoke(new MethodInvoker(delegate { initializeOrFinalizeRefresh(false); }));
+                initializeOrFinalizeRefresh(false, false);
                 return;
             }
 
@@ -119,11 +127,9 @@ You need an Apple device running jaibroken iOs with the following packages insta
             }
 
             // Add new devices to the list
-            List<iDevice> newDevices = deviceList.Where(x => !Devices.Any(y => y.Udid == x.Udid)).ToList();
-            newDevices.ForEach(x => x.IsConnected = true);
-            Devices.AddRange(newDevices);
+            Devices = deviceList.Union(Devices, new iDeviceEqualityComparer()).ToList();
 
-            BeginInvoke(new MethodInvoker(() => { applyDeviceList(); initializeOrFinalizeRefresh(false); }));
+            initializeOrFinalizeRefresh(false, true);
         }
 
         void applyDeviceList()
@@ -131,13 +137,13 @@ You need an Apple device running jaibroken iOs with the following packages insta
             // Determine currently selected device
             string selectedUdid = listedDevices.Count != 0 ? listedDevices[selectDeviceBox.SelectedIndex].Udid : null;
 
-            // Clear combo box and if no devices connected, change its text to error message
+            // Clear combo box and if no device is connected, change its text to error message
             selectDeviceBox.Items.Clear();
 
             List<iDevice> connectedDevices = Devices.Where(x => x.IsConnected).ToList();
             if (connectedDevices.Count == 0)
             {
-                selectedUdid = null;
+                listedDevices.Clear();
 
                 selectDeviceBox.Items.Add("No iDevice Has Been Detected...");
                 selectDeviceBox.SelectedIndex = 0;
@@ -162,7 +168,7 @@ You need an Apple device running jaibroken iOs with the following packages insta
 
                 selectDeviceBox.Items.Add(currItemString);
             }
-            
+
             // If last selected index can't be determined, return
             if (listedDevices.Count == 0 || selectedUdid == null)
             {
@@ -175,10 +181,87 @@ You need an Apple device running jaibroken iOs with the following packages insta
             selectDeviceBox.SelectedIndex = udidIndex != -1 ? udidIndex : 0;
         }
 
-        void initializeOrFinalizeRefresh(bool isInitialization)
+        void initializeOrFinalizeRefresh(bool isInitialization, bool isApply)
         {
-            refreshButton.Enabled = !isInitialization;
-            manageButton.Enabled = !isInitialization;
+            if (InvokeRequired)
+            {
+                BeginInvoke(new MethodInvoker(() =>
+                {
+                    refreshButton.Enabled = !isInitialization;
+                    manageButton.Enabled = !isInitialization;
+                }));
+
+                if (isApply)
+                {
+                    BeginInvoke(new MethodInvoker(() =>
+                    {
+                        applyDeviceList();
+                    }));
+                }
+            }
+
+            else
+            {
+                refreshButton.Enabled = !isInitialization;
+                manageButton.Enabled = !isInitialization;
+
+                if (isApply) applyDeviceList();
+            }
+        }
+        #endregion
+
+        #region Other Functions
+        bool connectToInstallationProxy()
+        {
+            Cursor = Cursors.AppStarting;
+
+            // Connect to the iDevice
+            iDevice workingDevice = StartForm.WorkingDevice;
+            LibiMobileDevice.iDeviceError deviceReturnCode = LibiMobileDevice.NewDevice(out workingDevice.Handle, workingDevice.Udid);
+            if (deviceReturnCode != LibiMobileDevice.iDeviceError.IDEVICE_E_SUCCESS)
+            {
+                showError("Couldn't connect to " + workingDevice.Name + ". Please check the connection.",
+                    "Connection failed");
+                return false;
+            }
+
+            // Start Installation Proxy service
+            Lockdown.LockdownError lockdownReturnCode = Lockdown.Start(
+                workingDevice.Handle,
+                out workingDevice.LockdownClient,
+                out workingDevice.InstallationProxyService);
+            if (lockdownReturnCode != Lockdown.LockdownError.LOCKDOWN_E_SUCCESS)
+            {
+                showError("Couldn't start Installation Proxy. Please check the connection to the device.",
+                    "Installation Proxy start failed");
+                return false;
+            }
+
+            // Connect to Installation Proxy service
+            InstallationProxy.InstproxyError installProxyReturnCode = InstallationProxy.Connect(
+                workingDevice.Handle,
+                workingDevice.InstallationProxyService,
+                out workingDevice.InstallationProxyClient);
+            if (installProxyReturnCode != InstallationProxy.InstproxyError.INSTPROXY_E_SUCCESS)
+            {
+                showError("Couldn't connect to Installation Proxy. Please check the connection to the device.",
+                    "Installation Proxy connection failed");
+                return false;
+            }
+
+            Cursor = Cursors.Default;
+            return true;
+        }
+
+        void showNotImplementedMessage()
+        {
+            MessageBox.Show("This feature hasn't been implemented yet.", "Not implemented",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        void showError(string errorString, string errorTitle)
+        {
+            MessageBox.Show(errorString, "Error:" + errorTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         #endregion
 

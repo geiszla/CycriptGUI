@@ -96,7 +96,7 @@ namespace CycriptGUI
             // 
             // analyzeButton
             // 
-            this.analyzeButton.Location = new System.Drawing.Point(222, 275);
+            this.analyzeButton.Location = new System.Drawing.Point(59, 275);
             this.analyzeButton.Name = "analyzeButton";
             this.analyzeButton.Size = new System.Drawing.Size(97, 23);
             this.analyzeButton.TabIndex = 4;
@@ -106,7 +106,7 @@ namespace CycriptGUI
             // 
             // cancelButton
             // 
-            this.cancelButton.Location = new System.Drawing.Point(59, 275);
+            this.cancelButton.Location = new System.Drawing.Point(221, 275);
             this.cancelButton.Name = "cancelButton";
             this.cancelButton.Size = new System.Drawing.Size(97, 23);
             this.cancelButton.TabIndex = 5;
@@ -184,8 +184,6 @@ namespace CycriptGUI
             this.Name = "SelectForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
             this.Text = "Select Application";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.selectForm_FormClosing);
-            this.Load += new System.EventHandler(this.SelectForm_Load);
             this.Shown += new System.EventHandler(this.SelectForm_Shown);
             ((System.ComponentModel.ISupportInitialize)(this.resultsTable)).EndInit();
             this.ResumeLayout(false);

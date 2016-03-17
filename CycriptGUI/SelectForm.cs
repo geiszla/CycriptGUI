@@ -13,38 +13,37 @@ namespace CycriptGUI
     public partial class SelectForm : Form
     {
         static CancellationTokenSource cancellationTokenSource;
-        public List<iOSApplication> AppList;
+        List<iOSApplication> AppList;
 
         public SelectForm()
         {
             InitializeComponent();
         }
 
-        private void SelectForm_Load(object sender, EventArgs e)
-        {
-            iDevice workingDevice = StartForm.WorkingDevice;
-            LibiMobileDevice.iDeviceError deviceReturnCode = LibiMobileDevice.NewDevice(out workingDevice.Handle, workingDevice.Udid);
-
-            Lockdown.LockdownError lockdownReturnCode = Lockdown.Start(
-                workingDevice.Handle,
-                out workingDevice.LockdownClient,
-                out workingDevice.InstallationProxyService);
-
-            InstallationProxy.InstproxyError installProxyReturnCode = InstallationProxy.Connect(
-                workingDevice.Handle,
-                workingDevice.InstallationProxyService,
-                out workingDevice.InstallationProxyClient);
-        }
-
         private void SelectForm_Shown(object sender, EventArgs e)
         {
+            // Initialize controls
             searchInSelect.SelectedIndex = 0;
 
+            // Get application list
             cancellationTokenSource = new CancellationTokenSource();
             Task getApplicationsTask = Task.Factory.StartNew(() => { updateAppList(); }, cancellationTokenSource.Token);
         }
 
         #region Other Events
+        private void InstallationProxy_ProgressChanged(object sender, EventArgs e)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new MethodInvoker(() => { loadingBar.PerformStep(); }));
+            }
+
+            else
+            {
+                loadingBar.PerformStep();
+            }
+        }
+
         private void searchBox_TextChanged(object sender, EventArgs e)
         {
             applyAppSelectLayout();
@@ -65,11 +64,8 @@ namespace CycriptGUI
 
         private void cancelButton_Click(object sender, EventArgs e)
         {
-            Close();
-        }
+            Cursor = Cursors.AppStarting;
 
-        private void selectForm_FormClosing(object sender, FormClosingEventArgs e)
-        {
             cancellationTokenSource.Cancel();
             iDevice workingDevice = StartForm.WorkingDevice;
 
@@ -80,6 +76,9 @@ namespace CycriptGUI
             workingDevice.InstallationProxyService = IntPtr.Zero;
 
             LibiMobileDevice.FreeDevice(StartForm.WorkingDevice);
+
+            Cursor = Cursors.Default;
+            Close();
         }
         #endregion
 
@@ -149,7 +148,9 @@ namespace CycriptGUI
             }));
 
             // Getting applications
+            InstallationProxy.ProgressChanged += InstallationProxy_ProgressChanged;
             InstallationProxy.GetApplications(StartForm.WorkingDevice.InstallationProxyClient, this, out AppList);
+            InstallationProxy.ProgressChanged -= InstallationProxy_ProgressChanged;
 
             // Changing layout after updating
             if (InvokeRequired)

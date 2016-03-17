@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Windows.Forms;
 using System.Xml.Linq;
 
 namespace CycriptGUI.LibIMobileDevice
@@ -82,34 +81,35 @@ namespace CycriptGUI.LibIMobileDevice
 
         // Connect
         #region DllImports
-        [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, EntryPoint = "instproxy_client_new", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibiMobileDevice.LIBIMOBILEDEVICE_DLL_PATH, EntryPoint = "instproxy_client_new", CallingConvention = CallingConvention.Cdecl)]
         public static extern InstproxyError Connect(IntPtr devicePtr, IntPtr lockdownService, out IntPtr instProxyClient);
         #endregion
 
         // Working With Installation Proxy
         #region DllImports
-        [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibiMobileDevice.LIBIMOBILEDEVICE_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
         static extern InstproxyError instproxy_browse(IntPtr instProxyClient, IntPtr clientOptions, out IntPtr result);
 
-        [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibiMobileDevice.LIBIMOBILEDEVICE_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
         static extern IntPtr instproxy_client_options_new();
 
-        [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibiMobileDevice.LIBIMOBILEDEVICE_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
         static extern void instproxy_client_options_add(IntPtr clientOptions, string key, string value, IntPtr zero);
         #endregion
 
+        #region Functions
         public static InstproxyError GetApplications(IntPtr installProxyClient, SelectForm selectForm, out List<iOSApplication> appList)
         {
             IntPtr clientOptions = instproxy_client_options_new();
             instproxy_client_options_add(clientOptions, "ApplicationType", "Any", IntPtr.Zero);
 
-            selectForm.BeginInvoke(new MethodInvoker(() => { selectForm.loadingBar.PerformStep(); }));
+            OnProgressChanged(EventArgs.Empty);
 
             IntPtr resultPlist;
             InstproxyError returnCode = instproxy_browse(installProxyClient, clientOptions, out resultPlist);
             instproxy_client_options_free(clientOptions);
 
-            XDocument resultXml = LibiMobileDevice.PlistToXml(resultPlist);
+            XDocument resultXml = new XDocument();
             appList = new List<iOSApplication>();
             if (returnCode != InstproxyError.INSTPROXY_E_SUCCESS)
             {
@@ -121,7 +121,9 @@ namespace CycriptGUI.LibIMobileDevice
                 return InstproxyError.INSTPROXY_E_UNKNOWN_ERROR;
             }
 
-            selectForm.BeginInvoke(new MethodInvoker(() => { selectForm.loadingBar.PerformStep(); }));
+            resultXml = LibiMobileDevice.PlistToXml(resultPlist);
+
+            OnProgressChanged(EventArgs.Empty);
 
             List<XElement> appElementList = resultXml.Descendants("dict").Where(x => x.Parent.Parent.Name == "plist").ToList();
             appList = new List<iOSApplication>();
@@ -148,13 +150,24 @@ namespace CycriptGUI.LibIMobileDevice
         {
             return rootElement.Descendants("key").Where(x => x.Value == key).Select(x => (x.NextNode as XElement).Value).FirstOrDefault();
         }
+        #endregion
+
+        #region Progress Bar Event
+        static void OnProgressChanged(EventArgs e)
+        {
+            EventHandler handler = ProgressChanged;
+            if (handler != null) handler(null, e);
+        }
+
+        public static event EventHandler ProgressChanged;
+        #endregion
 
         // Free
         #region DllImports
-        [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, EntryPoint = "instproxy_client_free", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibiMobileDevice.LIBIMOBILEDEVICE_DLL_PATH, EntryPoint = "instproxy_client_free", CallingConvention = CallingConvention.Cdecl)]
         public static extern InstproxyError FreeClient(IntPtr instProxyClient);
 
-        [DllImport(LibiMobileDevice.LibimobiledeviceDllPath, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibiMobileDevice.LIBIMOBILEDEVICE_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
         static extern InstproxyError instproxy_client_options_free(IntPtr clientOptions);
         #endregion
     }
