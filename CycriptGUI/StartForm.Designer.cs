@@ -171,6 +171,7 @@
             this.Name = "StartForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Cycript GUI";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.StartForm_FormClosing);
             this.Load += new System.EventHandler(this.StartForm_Load);
             this.Shown += new System.EventHandler(this.StartForm_Shown);
             this.selectDeviceGroup.ResumeLayout(false);

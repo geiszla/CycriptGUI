@@ -15,7 +15,7 @@ namespace CycriptGUI
 
         List<iDevice> Devices = new List<iDevice>();
         List<iDevice> listedDevices = new List<iDevice>();
-        Task UpdateTask;
+        bool isUpdateInProgress;
 
         public StartForm()
         {
@@ -36,7 +36,16 @@ You need an Apple device running jaibroken iOs with the following packages insta
         private void StartForm_Shown(object sender, EventArgs e)
         {
             selectDeviceBox.SelectedIndex = 0;
-            UpdateTask = Task.Factory.StartNew(() => { refreshDeviceList(); });
+
+            Task.Factory.StartNew(() => { refreshDeviceList(); });
+
+            bool success = LibiMobileDevice.SubscribeDeviceEvent();
+            if (success) LibiMobileDevice.DeviceStateChanged += LibiMobileDevice_DeviceStateChanged;
+        }
+
+        private void StartForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            LibiMobileDevice.UnsubscribeDeviceEvent();
         }
         #endregion
 
@@ -49,7 +58,7 @@ You need an Apple device running jaibroken iOs with the following packages insta
                 WorkingDevice = Devices.Where(x => x.IsConnected == true).ToList()[selectDeviceBox.SelectedIndex];
             }
 
-            else if (!UpdateTask.IsCompleted)
+            else if (isUpdateInProgress)
             {
                 MessageBox.Show("Please wait, while the program finishes searching for devices!", "Search in progress",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -88,20 +97,55 @@ You need an Apple device running jaibroken iOs with the following packages insta
 
         private void refreshButton_Click(object sender, EventArgs e)
         {
-            UpdateTask = Task.Factory.StartNew(() => { refreshDeviceList(); });
+            Task.Factory.StartNew(() => { refreshDeviceList(); });
         }
 
         private void manageButton_Click(object sender, EventArgs e)
         {
             showNotImplementedMessage();
-            //Ssh.Connect(listedDevices[selectDeviceBox.SelectedIndex].Udid);
+        }
+
+        private void LibiMobileDevice_DeviceStateChanged(object sender, EventArgs e)
+        {
+            if (isUpdateInProgress) return;
+            initializeOrFinalizeRefresh(true);
+
+            iDeviceEventArgs eventArgs = (iDeviceEventArgs)e;
+            Devices.RemoveAll(x => x.Udid == eventArgs.Udid);
+
+            if (eventArgs.EventType == iDeviceEventArgs.iDeviceEventType.IDEVICE_DEVICE_REMOVE)
+            {
+                Task.Factory.StartNew(() => { refreshDeviceList(); });
+                return;
+            }
+
+            else if (eventArgs.EventType == iDeviceEventArgs.iDeviceEventType.IDEVICE_DEVICE_ADD)
+            {
+                IntPtr devicePtr;
+                LibiMobileDevice.iDeviceError returnCode = LibiMobileDevice.NewDevice(out devicePtr, eventArgs.Udid);
+
+                if (returnCode != LibiMobileDevice.iDeviceError.IDEVICE_E_SUCCESS || devicePtr == IntPtr.Zero)
+                {
+                    return;
+                }
+
+                iDeviceHandle senderHandle = new iDeviceHandle(devicePtr, eventArgs.Udid);
+
+                iDevice newDevice;
+                if (LibiMobileDevice.GetDeviceFromHandle(senderHandle, out newDevice))
+                {
+                    Devices.Add(newDevice);
+                }
+            }
+
+            initializeOrFinalizeRefresh(false, true);
         }
         #endregion
 
-        #region Update Device List Functions
+        #region Update Device List
         void refreshDeviceList()
         {
-            initializeOrFinalizeRefresh(true, false);
+            initializeOrFinalizeRefresh(true);
 
             // Get new devices and remove duplicates
             List<iDevice> deviceList;
@@ -112,7 +156,7 @@ You need an Apple device running jaibroken iOs with the following packages insta
             if (deviceList != null && deviceList.Count != 0 && listedDevices.Count == deviceList.Count &&
                 deviceList.Join(listedDevices, x => x.Udid, y => y.Udid, (x, y) => x).Count() == deviceList.Count)
             {
-                initializeOrFinalizeRefresh(false, false);
+                initializeOrFinalizeRefresh(false);
                 return;
             }
 
@@ -179,10 +223,14 @@ You need an Apple device running jaibroken iOs with the following packages insta
             // Else set the currently selected index to last selected index
             int udidIndex = connectedDevices.IndexOf(connectedDevices.Where(x => x.Udid == selectedUdid).FirstOrDefault());
             selectDeviceBox.SelectedIndex = udidIndex != -1 ? udidIndex : 0;
+
+            isUpdateInProgress = false;
         }
 
-        void initializeOrFinalizeRefresh(bool isInitialization, bool isApply)
+        void initializeOrFinalizeRefresh(bool isInitialization, bool isApply = false)
         {
+            if (isInitialization) isUpdateInProgress = true;
+
             if (InvokeRequired)
             {
                 BeginInvoke(new MethodInvoker(() =>
@@ -207,6 +255,8 @@ You need an Apple device running jaibroken iOs with the following packages insta
 
                 if (isApply) applyDeviceList();
             }
+
+            if (!isInitialization) isUpdateInProgress = false;
         }
         #endregion
 
@@ -262,54 +312,6 @@ You need an Apple device running jaibroken iOs with the following packages insta
         void showError(string errorString, string errorTitle)
         {
             MessageBox.Show(errorString, "Error:" + errorTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-        #endregion
-
-        #region New USB Device Event
-        private const int WM_DEVICECHANGE = 0x0219;
-        bool eventHappened = false;
-        System.Timers.Timer newEventTimer;
-
-        protected override void WndProc(ref Message m)
-        {
-            // Getting device change event and starting a new timer
-            if (m.Msg == WM_DEVICECHANGE && m.WParam.ToInt32() == 0x0007)
-            {
-                if (newEventTimer == null)
-                {
-                    newEventTimer = new System.Timers.Timer(500);
-                    newEventTimer.Elapsed += newEventTimer_Elapsed;
-                    newEventTimer.Start();
-                }
-
-                else if (newEventTimer.Enabled == false)
-                {
-                    newEventTimer.Start();
-                }
-
-                else
-                {
-                    eventHappened = true;
-                }
-            }
-
-            base.WndProc(ref m);
-        }
-
-        void newEventTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
-        {
-            // If there was a change since timer started, then starting timer again, else stopping timer and updating device list
-            // (used to avoid too much device list update due to multiple connection messages)
-            if (eventHappened == true)
-            {
-                eventHappened = false;
-            }
-
-            else
-            {
-                newEventTimer.Stop();
-                refreshDeviceList();
-            }
         }
         #endregion
     }

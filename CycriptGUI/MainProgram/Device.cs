@@ -101,6 +101,15 @@ namespace CycriptGUI.MainProgram
         }
     }
 
+    class iDeviceHandle : Device
+    {
+        public iDeviceHandle(IntPtr handle, string udid)
+        {
+            Handle = handle;
+            Udid = udid;
+        }
+    }
+
     public class iDeviceEqualityComparer : IEqualityComparer<iDevice>
     {
         public bool Equals(iDevice device1, iDevice device2)
@@ -119,15 +128,6 @@ namespace CycriptGUI.MainProgram
 
                 return hash;
             }
-        }
-    }
-
-    class ResultDevice : Device
-    {
-        public ResultDevice(IntPtr handle, string udid)
-        {
-            Handle = handle;
-            Udid = udid;
         }
     }
 }
