@@ -149,8 +149,14 @@ namespace CycriptGUI
 
             // Getting applications
             InstallationProxy.ProgressChanged += InstallationProxy_ProgressChanged;
-            InstallationProxy.GetApplications(StartForm.WorkingDevice.InstallationProxyClient, this, out AppList);
+            InstallationProxy.InstproxyError returnCode = InstallationProxy.GetApplications(StartForm.WorkingDevice.InstallationProxyClient, this, out AppList);
             InstallationProxy.ProgressChanged -= InstallationProxy_ProgressChanged;
+
+            if (returnCode != InstallationProxy.InstproxyError.INSTPROXY_E_SUCCESS)
+            {
+                MessageBox.Show("Couldn't update app list, please check the connection to the device.", "Getting apps failed",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
 
             // Changing layout after updating
             if (InvokeRequired)

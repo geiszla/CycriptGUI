@@ -37,10 +37,17 @@ You need an Apple device running jaibroken iOs with the following packages insta
         {
             selectDeviceBox.SelectedIndex = 0;
 
-            Task.Factory.StartNew(() => { refreshDeviceList(); });
+            Task.Factory.StartNew(() => refreshDeviceList());
 
+            // Subscribe to device event
             bool success = LibiMobileDevice.SubscribeDeviceEvent();
-            if (success) LibiMobileDevice.DeviceStateChanged += LibiMobileDevice_DeviceStateChanged;
+            if (!success)
+            {
+                showError("Couldn't subscribe to device change event. You will have to refresh the device list manually.",
+                    "Device event subscription failed");
+                return;
+            }
+            LibiMobileDevice.DeviceStateChanged += LibiMobileDevice_DeviceStateChanged;
         }
 
         private void StartForm_FormClosing(object sender, FormClosingEventArgs e)
@@ -97,7 +104,7 @@ You need an Apple device running jaibroken iOs with the following packages insta
 
         private void refreshButton_Click(object sender, EventArgs e)
         {
-            Task.Factory.StartNew(() => { refreshDeviceList(); });
+            Task.Factory.StartNew(() => refreshDeviceList());
         }
 
         private void manageButton_Click(object sender, EventArgs e)
@@ -107,35 +114,48 @@ You need an Apple device running jaibroken iOs with the following packages insta
 
         private void LibiMobileDevice_DeviceStateChanged(object sender, EventArgs e)
         {
+            // Initialize refresh
             if (isUpdateInProgress) return;
             initializeOrFinalizeRefresh(true);
 
+            // Remove current device from the device list
             iDeviceEventArgs eventArgs = (iDeviceEventArgs)e;
             Devices.RemoveAll(x => x.Udid == eventArgs.Udid);
 
+            // If the device was removed refresh the list again for WiFi connection
             if (eventArgs.EventType == iDeviceEventArgs.iDeviceEventType.IDEVICE_DEVICE_REMOVE)
             {
-                Task.Factory.StartNew(() => { refreshDeviceList(); });
+                Task.Factory.StartNew(() => refreshDeviceList());
                 return;
             }
-
+            
             else if (eventArgs.EventType == iDeviceEventArgs.iDeviceEventType.IDEVICE_DEVICE_ADD)
             {
+                // If the device was added connect to it
                 IntPtr devicePtr;
                 LibiMobileDevice.iDeviceError returnCode = LibiMobileDevice.NewDevice(out devicePtr, eventArgs.Udid);
-
                 if (returnCode != LibiMobileDevice.iDeviceError.IDEVICE_E_SUCCESS || devicePtr == IntPtr.Zero)
                 {
+                    showError("Couldn't connect to the device with UDID \'" + eventArgs.Udid + "\'. Please check the connection.",
+                        "Connection failed");
+                    initializeOrFinalizeRefresh(false);
                     return;
                 }
 
+                // Get device properties
                 iDeviceHandle senderHandle = new iDeviceHandle(devicePtr, eventArgs.Udid);
 
                 iDevice newDevice;
-                if (LibiMobileDevice.GetDeviceFromHandle(senderHandle, out newDevice))
+                if (!LibiMobileDevice.GetDeviceFromHandle(senderHandle, out newDevice) || newDevice == null)
                 {
-                    Devices.Add(newDevice);
+                    showError("Couldn't get properties of the device with UDID \'" + senderHandle.Udid + "\'. Please check the connection.",
+                        "Get properties failed.");
+                    initializeOrFinalizeRefresh(false);
+                    return;
                 }
+
+                // Add new device to the list
+                Devices.Add(newDevice);
             }
 
             initializeOrFinalizeRefresh(false, true);
@@ -149,7 +169,15 @@ You need an Apple device running jaibroken iOs with the following packages insta
 
             // Get new devices and remove duplicates
             List<iDevice> deviceList;
-            LibiMobileDevice.GetDeviceList(out deviceList);
+            LibiMobileDevice.iDeviceError returnCode = LibiMobileDevice.GetDeviceList(out deviceList);
+            if (returnCode != LibiMobileDevice.iDeviceError.IDEVICE_E_SUCCESS
+                && returnCode != LibiMobileDevice.iDeviceError.IDEVICE_E_NO_DEVICE)
+            {
+                showError("Couldn't get device list. Please try again.", "Device search failed");
+                initializeOrFinalizeRefresh(false);
+                return;
+            }
+
             deviceList = deviceList.GroupBy(x => x.Udid).Select(x => x.First()).ToList();
 
             // If the list haven't changed finalize refresh
@@ -311,7 +339,7 @@ You need an Apple device running jaibroken iOs with the following packages insta
 
         void showError(string errorString, string errorTitle)
         {
-            MessageBox.Show(errorString, "Error:" + errorTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(errorString, "Error: " + errorTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         #endregion
     }
