@@ -81,11 +81,11 @@ namespace CycriptGUI.LibIMobileDevice
 
         // Connect
         #region DllImports
-        [DllImport(LibiMobileDevice.LIBIMOBILEDEVICE_DLL_PATH, EntryPoint = "instproxy_client_new", CallingConvention = CallingConvention.Cdecl)]
-        public static extern InstproxyError Connect(IntPtr devicePtr, IntPtr lockdownService, out IntPtr instProxyClient);
+        [DllImport(LibiMobileDevice.LIBIMOBILEDEVICE_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
+        public static extern InstproxyError instproxy_client_new(IntPtr devicePtr, IntPtr lockdownService, out IntPtr instProxyClient);
         #endregion
 
-        // Working With Installation Proxy
+        // Work With Installation Proxy
         #region DllImports
         [DllImport(LibiMobileDevice.LIBIMOBILEDEVICE_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
         static extern InstproxyError instproxy_browse(IntPtr instProxyClient, IntPtr clientOptions, out IntPtr result);
@@ -98,30 +98,58 @@ namespace CycriptGUI.LibIMobileDevice
         #endregion
 
         #region Functions
-        public static InstproxyError GetApplications(IntPtr installProxyClient, SelectForm selectForm, out List<iOSApplication> appList)
+        public static bool Connect(iDevice device)
         {
+            // Must connect to device before calling
+
+            Lockdown.LockdownError lockdownReturnCode = Lockdown.Start(
+                device.Handle,
+                out device.LockdownClient,
+                out device.InstallationProxyService);
+            if (lockdownReturnCode != Lockdown.LockdownError.LOCKDOWN_E_SUCCESS)
+            {
+                return false;
+            }
+
+            InstproxyError installProxyReturnCode = instproxy_client_new(
+                device.Handle,
+                device.InstallationProxyService,
+                out device.InstallationProxyClient);
+            if (installProxyReturnCode != InstproxyError.INSTPROXY_E_SUCCESS
+                || device.InstallationProxyClient == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            return true;
+
+            // Must free lockdown client, installation proxy service and client after using
+        }
+
+        public static bool GetApplications(iDevice device, out List<iOSApplication> appList)
+        {
+            // Must connect to device and to installation proxy before using
+
             IntPtr clientOptions = instproxy_client_options_new();
             instproxy_client_options_add(clientOptions, "ApplicationType", "Any", IntPtr.Zero);
 
             OnProgressChanged(EventArgs.Empty);
 
             IntPtr resultPlist;
-            InstproxyError returnCode = instproxy_browse(installProxyClient, clientOptions, out resultPlist);
+            InstproxyError returnCode = instproxy_browse(device.InstallationProxyClient, clientOptions, out resultPlist);
             instproxy_client_options_free(clientOptions);
 
             XDocument resultXml = new XDocument();
             appList = new List<iOSApplication>();
-            if (returnCode != InstproxyError.INSTPROXY_E_SUCCESS)
+            if (returnCode != InstproxyError.INSTPROXY_E_SUCCESS
+                || resultPlist == IntPtr.Zero
+                || resultXml == default(XDocument))
             {
-                return returnCode;
+                return false;
             }
 
-            else if (resultPlist == IntPtr.Zero || resultXml == default(XDocument))
-            {
-                return InstproxyError.INSTPROXY_E_UNKNOWN_ERROR;
-            }
-
-            resultXml = LibiMobileDevice.PlistToXml(resultPlist);
+            resultXml = LibPlist.PlistToXml(resultPlist);
+            LibPlist.FreePlist(resultPlist);
 
             OnProgressChanged(EventArgs.Empty);
 
@@ -143,7 +171,7 @@ namespace CycriptGUI.LibIMobileDevice
                 appList.Add(newApp);
             }
 
-            return returnCode;
+            return true;
         }
 
         static string getAttribute(XElement rootElement, string key)
@@ -155,8 +183,7 @@ namespace CycriptGUI.LibIMobileDevice
         #region Progress Bar Event
         static void OnProgressChanged(EventArgs e)
         {
-            EventHandler handler = ProgressChanged;
-            if (handler != null) handler(null, e);
+            ProgressChanged?.Invoke(null, e);
         }
 
         public static event EventHandler ProgressChanged;

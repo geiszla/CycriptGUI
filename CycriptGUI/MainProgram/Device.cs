@@ -1,5 +1,8 @@
-﻿using System;
+﻿using CycriptGUI.LibIMobileDevice;
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Xml.Linq;
 
 namespace CycriptGUI.MainProgram
 {
@@ -7,9 +10,34 @@ namespace CycriptGUI.MainProgram
     {
         public IntPtr Handle;
         public string Udid;
+
+        public bool Connect()
+        {
+            return LibiMobileDevice.NewDevice(out Handle, Udid);
+
+            // Must free device after using
+        }
+
+        #region Dispose
+        ~Device()
+        {
+            Dispose(false);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            LibiMobileDevice.FreeDevice(Handle);
+            Handle = IntPtr.Zero;
+        }
+        #endregion
     }
 
-    public class iDevice : Device
+    public class iDevice : Device, IDisposable
     {
         #region Device Hardware
         Dictionary<string, string> DeviceHardware = new Dictionary<string, string>()
@@ -31,6 +59,7 @@ namespace CycriptGUI.MainProgram
             { "iPhone7,2", "iPhone 6" },
             { "iPhone8,1", "iPhone 6S" },
             { "iPhone8,2", "iPhone 6S Plus" },
+            { "iPhone8,4", "iPhone SE" },
 
             { "iPod1,1", "iPod Touch 1G" },
             { "iPod2,1", "iPod Touch 2G" },
@@ -82,6 +111,11 @@ namespace CycriptGUI.MainProgram
         public string Name;
         public string ProductType;
         public string ProductName;
+        public string iOSVersion;
+        public string Capacity;
+        public string PhoneNumber;
+        public string Region;
+        public string CPUArchitecture;
 
         public IntPtr LockdownClient;
         public IntPtr InstallationProxyService;
@@ -89,7 +123,8 @@ namespace CycriptGUI.MainProgram
 
         public bool IsConnected;
 
-        public iDevice(IntPtr handle, string udid, string serialNumber, string name, string productType)
+        public iDevice(IntPtr handle, string udid, string serialNumber, string name, string productType,
+            string iosVersion, string phoneNumber, string region, string cpuArchitecture)
         {
             IsConnected = true;
             Handle = handle;
@@ -98,7 +133,37 @@ namespace CycriptGUI.MainProgram
             Name = name;
             ProductType = productType;
             ProductName = DeviceHardware[productType];
+            iOSVersion = iosVersion;
+            PhoneNumber = phoneNumber;
+            Region = region;
+            CPUArchitecture = cpuArchitecture;
         }
+
+        #region Dispose
+        ~iDevice()
+        {
+            Dispose(false);
+        }
+
+        public new void Dispose()
+        {
+            Dispose(true);
+        }
+
+        protected new virtual void Dispose(bool disposing)
+        {
+            InstallationProxy.FreeClient(InstallationProxyClient);
+            InstallationProxyClient = IntPtr.Zero;
+
+            Lockdown.FreeService(InstallationProxyService);
+            InstallationProxyService = IntPtr.Zero;
+
+            Lockdown.FreeClient(LockdownClient);
+            LockdownClient = IntPtr.Zero;
+
+            base.Dispose(false);
+        }
+        #endregion
     }
 
     class iDeviceHandle : Device
@@ -107,6 +172,45 @@ namespace CycriptGUI.MainProgram
         {
             Handle = handle;
             Udid = udid;
+        }
+
+        public bool GetIDeviceFromHandle(out iDevice newDevice)
+        {
+            IntPtr lockdownService;
+            IntPtr lockdownClient;
+            Lockdown.LockdownError lockdownReturnCode = Lockdown.Start(Handle, out lockdownClient, out lockdownService);
+
+            newDevice = null;
+            if (lockdownReturnCode != Lockdown.LockdownError.LOCKDOWN_E_SUCCESS)
+            {
+                return false;
+            }
+
+            XDocument deviceProperties;
+            lockdownReturnCode = Lockdown.GetProperties(lockdownClient, out deviceProperties);
+
+            Lockdown.FreeService(lockdownService);
+            Lockdown.FreeClient(lockdownClient);
+
+            if (lockdownReturnCode != Lockdown.LockdownError.LOCKDOWN_E_SUCCESS || deviceProperties == default(XDocument))
+            {
+                return false;
+            }
+
+            IEnumerable<XElement> keys = deviceProperties.Descendants("dict").Descendants("key");
+            newDevice = new iDevice(
+                IntPtr.Zero,
+                keys.Where(x => x.Value == "UniqueDeviceID").Select(x => (x.NextNode as XElement).Value).FirstOrDefault(),
+                keys.Where(x => x.Value == "SerialNumber").Select(x => (x.NextNode as XElement).Value).FirstOrDefault(),
+                keys.Where(x => x.Value == "DeviceName").Select(x => (x.NextNode as XElement).Value).FirstOrDefault(),
+                keys.Where(x => x.Value == "ProductType").Select(x => (x.NextNode as XElement).Value).FirstOrDefault(),
+                keys.Where(x => x.Value == "ProductVersion").Select(x => (x.NextNode as XElement).Value).FirstOrDefault(),
+                keys.Where(x => x.Value == "PhoneNumber").Select(x => (x.NextNode as XElement).Value).FirstOrDefault(),
+                keys.Where(x => x.Value == "RegionInfo").Select(x => (x.NextNode as XElement).Value).FirstOrDefault(),
+                keys.Where(x => x.Value == "CPUArchitecture").Select(x => (x.NextNode as XElement).Value).FirstOrDefault()
+            );
+
+            return true;
         }
     }
 

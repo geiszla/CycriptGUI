@@ -72,8 +72,10 @@
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="LibIMobileDevice\AFC.cs" />
     <Compile Include="LibIMobileDevice\InstallationProxy.cs" />
     <Compile Include="LibIMobileDevice\LibiMobileDevice.cs" />
+    <Compile Include="LibIMobileDevice\LibPlist.cs" />
     <Compile Include="LibIMobileDevice\Lockdown.cs" />
     <Compile Include="LoadingForm.cs">
       <SubType>Form</SubType>
@@ -84,7 +86,14 @@
     <Compile Include="MainProgram\Device.cs" />
     <Compile Include="MainProgram\iOSProcess.cs" />
     <Compile Include="MainProgram\iOSApplication.cs" />
+    <Compile Include="MainProgram\Alert.cs" />
     <Compile Include="MainProgram\Ssh.cs" />
+    <Compile Include="ManageForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="ManageForm.Designer.cs">
+      <DependentUpon>ManageForm.cs</DependentUpon>
+    </Compile>
     <Compile Include="SelectForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -101,6 +110,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="LoadingForm.resx">
       <DependentUpon>LoadingForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="ManageForm.resx">
+      <DependentUpon>ManageForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="SelectForm.resx">
       <DependentUpon>SelectForm.cs</DependentUpon>

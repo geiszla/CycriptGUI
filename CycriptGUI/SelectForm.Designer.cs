@@ -103,6 +103,7 @@ namespace CycriptGUI
             this.analyzeButton.Text = "Start Session";
             this.analyzeButton.UseVisualStyleBackColor = true;
             this.analyzeButton.Visible = false;
+            this.analyzeButton.Click += new System.EventHandler(this.analyzeButton_Click);
             // 
             // cancelButton
             // 
@@ -184,6 +185,7 @@ namespace CycriptGUI
             this.Name = "SelectForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
             this.Text = "Select Application";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.SelectForm_FormClosing);
             this.Shown += new System.EventHandler(this.SelectForm_Shown);
             ((System.ComponentModel.ISupportInitialize)(this.resultsTable)).EndInit();
             this.ResumeLayout(false);

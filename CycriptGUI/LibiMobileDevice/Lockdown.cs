@@ -57,9 +57,9 @@ namespace CycriptGUI.LibIMobileDevice
         static extern LockdownError lockdownd_start_service(IntPtr lockDownClient, string identifier, out IntPtr service);
         #endregion
 
-        public static LockdownError Start(IntPtr device, out IntPtr client, out IntPtr service)
+        public static LockdownError Start(IntPtr deviceHandle, out IntPtr client, out IntPtr service)
         {
-            LockdownError returnCode = lockdownd_client_new_with_handshake(device, out client, LOCKDOWN_LABEL);
+            LockdownError returnCode = lockdownd_client_new_with_handshake(deviceHandle, out client, LOCKDOWN_LABEL);
             service = IntPtr.Zero;
             if (returnCode != LockdownError.LOCKDOWN_E_SUCCESS)
             {
@@ -72,12 +72,22 @@ namespace CycriptGUI.LibIMobileDevice
             }
 
             returnCode = lockdownd_start_service(client, SERVICE_IDENTIFIER, out service);
-            if (service == IntPtr.Zero) return LockdownError.LOCKDOWN_E_UNKNOWN_ERROR;
+            if (returnCode != LockdownError.LOCKDOWN_E_SUCCESS)
+            {
+                return returnCode;
+            }
+
+            else if (service == IntPtr.Zero)
+            {
+                return LockdownError.LOCKDOWN_E_UNKNOWN_ERROR;
+            }
 
             return returnCode;
+
+            // Must free lockdown client and service after using
         }
 
-        // Working With Lockdown Service
+        // Work With Lockdown Service
         #region Dll Imports
         [DllImport(LibiMobileDevice.LIBIMOBILEDEVICE_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
         static extern LockdownError lockdownd_get_value(IntPtr lockdownClient, string domain, string key, out IntPtr result);
@@ -99,7 +109,9 @@ namespace CycriptGUI.LibIMobileDevice
                 return LockdownError.LOCKDOWN_E_UNKNOWN_ERROR;
             }
 
-            result = LibiMobileDevice.PlistToXml(resultPlist);
+            result = LibPlist.PlistToXml(resultPlist);
+            LibPlist.FreePlist(resultPlist);
+
             return returnCode;
         }
 

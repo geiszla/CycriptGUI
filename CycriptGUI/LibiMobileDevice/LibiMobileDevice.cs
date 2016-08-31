@@ -3,15 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Xml.Linq;
 
 namespace CycriptGUI.LibIMobileDevice
 {
     class LibiMobileDevice
     {
         public const string LIBIMOBILEDEVICE_DLL_PATH = @"libimobiledevice.dll";
-        const string LIBPLIST_DLL_PATH = @"libplist.dll";
         public enum iDeviceError
         {
             IDEVICE_E_SUCCESS = 0,
@@ -31,11 +28,8 @@ namespace CycriptGUI.LibIMobileDevice
         static iDeviceEventCallback deviceEventCallback;
 
         #region DllImports
-        [DllImport(LIBPLIST_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
-        static extern void plist_to_xml(IntPtr plist, out IntPtr xml, out int length);
-
-        [DllImport(LIBIMOBILEDEVICE_DLL_PATH, EntryPoint = "idevice_new", CallingConvention = CallingConvention.Cdecl)]
-        public static extern iDeviceError NewDevice(out IntPtr devicePtr, string udid);
+        [DllImport(LIBIMOBILEDEVICE_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
+        public static extern iDeviceError idevice_new(out IntPtr devicePtr, string udid);
 
         [DllImport(LIBIMOBILEDEVICE_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
         static extern iDeviceError idevice_get_device_list(out IntPtr devicesPtr, out int count);
@@ -46,6 +40,7 @@ namespace CycriptGUI.LibIMobileDevice
         [DllImport(LIBIMOBILEDEVICE_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
         static extern iDeviceError idevice_event_unsubscribe();
 
+
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void iDeviceEventCallback(IntPtr deviceEventPtr);
         #endregion
@@ -53,8 +48,7 @@ namespace CycriptGUI.LibIMobileDevice
         #region Main Functions
         static void OnDeviceStateChanged(iDeviceEventArgs e)
         {
-            EventHandler handler = DeviceStateChanged;
-            if (handler != null) handler(null, e);
+            DeviceStateChanged?.Invoke(null, e);
         }
 
         public static event EventHandler DeviceStateChanged;
@@ -78,72 +72,33 @@ namespace CycriptGUI.LibIMobileDevice
             deviceEventCallback = null;
         }
 
-        public static iDeviceError GetDeviceList(out List<iDevice> deviceList)
+        public static bool GetDeviceList(out List<iDevice> deviceList)
         {
             List<iDeviceHandle> devices = new List<iDeviceHandle>();
-            IntPtr devicesPtr;
-            iDeviceError returnCode = searchForDevices(out devices, out devicesPtr);
+            iDeviceError returnCode = searchForDevices(out devices);
 
             deviceList = new List<iDevice>();
-            if (returnCode != iDeviceError.IDEVICE_E_SUCCESS)
-            {
-                return returnCode;
-            }
+
+            if (returnCode == iDeviceError.IDEVICE_E_NO_DEVICE) return true;
+            if (returnCode != iDeviceError.IDEVICE_E_SUCCESS) return false;
 
             foreach (iDeviceHandle currDeviceHandle in devices)
             {
                 iDevice newDevice;
-                bool success = GetDeviceFromHandle(currDeviceHandle, out newDevice);
+                bool success = currDeviceHandle.GetIDeviceFromHandle(out newDevice);
+                currDeviceHandle.Dispose();
 
                 if (!success || newDevice == null) continue;
 
                 deviceList.Add(newDevice);
             }
 
-            return returnCode;
-        }
-
-        public static bool GetDeviceFromHandle(iDeviceHandle currDeviceHandle, out iDevice newDevice)
-        {
-            IntPtr lockdownService;
-            IntPtr lockdownClient;
-            Lockdown.LockdownError lockdownReturnCode = Lockdown.Start(currDeviceHandle.Handle, out lockdownClient, out lockdownService);
-
-            newDevice = null;
-            if (lockdownReturnCode != Lockdown.LockdownError.LOCKDOWN_E_SUCCESS)
-            {
-                idevice_free(currDeviceHandle.Handle);
-                return false;
-            }
-
-            XDocument deviceProperties;
-            lockdownReturnCode = Lockdown.GetProperties(lockdownClient, out deviceProperties);
-            if (lockdownReturnCode != Lockdown.LockdownError.LOCKDOWN_E_SUCCESS || deviceProperties == default(XDocument))
-            {
-                lockdownReturnCode = Lockdown.FreeService(lockdownService);
-                lockdownReturnCode = Lockdown.FreeClient(lockdownClient);
-                idevice_free(currDeviceHandle.Handle);
-                return false;
-            }
-
-            Lockdown.FreeService(lockdownService);
-            Lockdown.FreeClient(lockdownClient);
-            idevice_free(currDeviceHandle.Handle);
-
-            IEnumerable<XElement> keys = deviceProperties.Descendants("dict").Descendants("key");
-            newDevice = new iDevice(
-                IntPtr.Zero,
-                keys.Where(x => x.Value == "UniqueDeviceID").Select(x => (x.NextNode as XElement).Value).FirstOrDefault(),
-                keys.Where(x => x.Value == "SerialNumber").Select(x => (x.NextNode as XElement).Value).FirstOrDefault(),
-                keys.Where(x => x.Value == "DeviceName").Select(x => (x.NextNode as XElement).Value).FirstOrDefault(),
-                keys.Where(x => x.Value == "ProductType").Select(x => (x.NextNode as XElement).Value).FirstOrDefault()
-            );
-
             return true;
         }
 
-        static iDeviceError searchForDevices(out List<iDeviceHandle> devices, out IntPtr devicesPtr)
+        static iDeviceError searchForDevices(out List<iDeviceHandle> devices)
         {
+            IntPtr devicesPtr;
             int count;
             iDeviceError returnCode = idevice_get_device_list(out devicesPtr, out count);
 
@@ -169,7 +124,7 @@ namespace CycriptGUI.LibIMobileDevice
                 && devices.Count(x => x.Udid == currUdid) == 0)
             {
                 IntPtr currDevice;
-                returnCode = NewDevice(out currDevice, currUdid);
+                if (!NewDevice(out currDevice, currUdid)) continue;
                 devices.Add(new iDeviceHandle(currDevice, currUdid));
                 i = i + 4;
             }
@@ -177,37 +132,43 @@ namespace CycriptGUI.LibIMobileDevice
             idevice_device_list_free(devicesPtr);
             return returnCode;
         }
+
+        public static bool NewDevice(out IntPtr devicePtr, string udid)
+        {
+            iDeviceError returnCode = idevice_new(out devicePtr, udid);
+            if (returnCode != iDeviceError.IDEVICE_E_SUCCESS || devicePtr == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            return true;
+
+            // Must free device after using
+        }
         #endregion
 
         #region Other Functions
-        public static XDocument PlistToXml(IntPtr plistPtr)
-        {
-            IntPtr xmlPtr;
-            int length;
-            plist_to_xml(plistPtr, out xmlPtr, out length);
-
-            byte[] resultBytes = new byte[length];
-            Marshal.Copy(xmlPtr, resultBytes, 0, length);
-
-            string resultString = Encoding.UTF8.GetString(resultBytes);
-            XDocument resultXml;
-            try
-            {
-                resultXml = XDocument.Parse(resultString);
-            }
-
-            catch
-            {
-                resultXml = new XDocument();
-            }
-
-            return resultXml;
-        }
-
         static void eventCallback(IntPtr deviceEventPtr)
         {
             iDeviceEvent deviceEvent = (iDeviceEvent)Marshal.PtrToStructure(deviceEventPtr, typeof(iDeviceEvent));
             OnDeviceStateChanged(new iDeviceEventArgs(deviceEvent));
+        }
+
+        public static List<string> PtrToStringList(IntPtr listPtr, int skip)
+        {
+            List<string> stringList = new List<string>();
+            if (Marshal.ReadInt32(listPtr) != 0)
+            {
+                string currString;
+                int i = skip * 4;
+                while ((currString = Marshal.PtrToStringAnsi(Marshal.ReadIntPtr(listPtr, i))) != null)
+                {
+                    stringList.Add(currString);
+                    i = i + 4;
+                }
+            }
+
+            return stringList;
         }
         #endregion
 
@@ -216,18 +177,9 @@ namespace CycriptGUI.LibIMobileDevice
         [DllImport(LIBIMOBILEDEVICE_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
         static extern iDeviceError idevice_device_list_free(IntPtr devicesPtr);
 
-        [DllImport(LIBIMOBILEDEVICE_DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
-        static extern iDeviceError idevice_free(IntPtr devicePtr);
+        [DllImport(LIBIMOBILEDEVICE_DLL_PATH, EntryPoint = "idevice_free", CallingConvention = CallingConvention.Cdecl)]
+        public static extern iDeviceError FreeDevice(IntPtr devicePtr);
         #endregion
-
-        public static void FreeDevice(iDevice device)
-        {
-            Lockdown.FreeClient(device.LockdownClient);
-            device.LockdownClient = IntPtr.Zero;
-
-            idevice_free(device.Handle);
-            device.Handle = IntPtr.Zero;
-        }
     }
 
     #region iDevice Event

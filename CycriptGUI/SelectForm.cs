@@ -30,6 +30,11 @@ namespace CycriptGUI
             Task getApplicationsTask = Task.Factory.StartNew(() => { updateAppList(); }, cancellationTokenSource.Token);
         }
 
+        private void SelectForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            cancellationTokenSource.Cancel();
+        }
+
         #region Other Events
         private void InstallationProxy_ProgressChanged(object sender, EventArgs e)
         {
@@ -62,6 +67,12 @@ namespace CycriptGUI
             Task getApplicationsTask = Task.Factory.StartNew(() => { updateAppList(); }, cancellationTokenSource.Token);
         }
 
+        private void analyzeButton_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("This feature hasn't been implemented yet.", "Not Implemented",
+                 MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
         private void cancelButton_Click(object sender, EventArgs e)
         {
             Cursor = Cursors.AppStarting;
@@ -75,7 +86,7 @@ namespace CycriptGUI
             Lockdown.FreeService(workingDevice.InstallationProxyService);
             workingDevice.InstallationProxyService = IntPtr.Zero;
 
-            LibiMobileDevice.FreeDevice(StartForm.WorkingDevice);
+            StartForm.WorkingDevice.Dispose();
 
             Cursor = Cursors.Default;
             Close();
@@ -90,7 +101,7 @@ namespace CycriptGUI
             newTable.Columns.Add("Version", typeof(string));
             newTable.Columns.Add("Identifier", typeof(string));
 
-            // Sorting list of applications
+            // Sort list of applications
             inputList.Sort(new Comparison<iOSApplication>((x, y) => string.Compare(x.Name, y.Name)));
             foreach (iOSApplication currApp in inputList)
             {
@@ -102,7 +113,7 @@ namespace CycriptGUI
 
         void applyAppSelectLayout()
         {
-            // Applying layout after application list update
+            // Apply layout after application list update
             loadingLabel.Visible = false;
             loadingBar.Visible = false;
             searchBox.Visible = true;
@@ -119,7 +130,7 @@ namespace CycriptGUI
             searchBox.Focus();
             int selectedIndex = searchInSelect.SelectedIndex;
 
-            // Determining application type for search and searching in properties of found applications
+            // Determine application type for search and searching in properties of found applications
             string appType = selectedIndex == 0 ? "User" : (selectedIndex == 1 ? "System" : (selectedIndex == 2 ? "Any" : "None"));
             List<iOSApplication> resultList = new List<iOSApplication>();
             if (appType != "None")
@@ -129,14 +140,14 @@ namespace CycriptGUI
                   || searchBox.Text.Contains(".") && x.Version.ToLower().Contains(searchBox.Text.ToLower())).ToList();
             }
 
-            // Setting up result table
+            // Set up result table
             resultsTable.DataSource = createDataTable(resultList);
             resultsTable.Columns[1].Width = 65;
         }
 
         void updateAppList()
         {
-            // Changing layout for updating
+            // Change layout for updating
             BeginInvoke(new MethodInvoker(delegate ()
             {
                 loadingBar.Value = 0;
@@ -147,18 +158,21 @@ namespace CycriptGUI
                 refreshButton.Enabled = false;
             }));
 
-            // Getting applications
+            // Get applications
             InstallationProxy.ProgressChanged += InstallationProxy_ProgressChanged;
-            InstallationProxy.InstproxyError returnCode = InstallationProxy.GetApplications(StartForm.WorkingDevice.InstallationProxyClient, this, out AppList);
+            bool success = InstallationProxy.GetApplications(StartForm.WorkingDevice, out AppList);
             InstallationProxy.ProgressChanged -= InstallationProxy_ProgressChanged;
 
-            if (returnCode != InstallationProxy.InstproxyError.INSTPROXY_E_SUCCESS)
+            if (cancellationTokenSource.IsCancellationRequested) return;
+
+            if (!success)
             {
-                MessageBox.Show("Couldn't update app list, please check the connection to the device.", "Getting apps failed",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Alert.ShowError("Couldn't update app list. Please check the connection to the device.",
+                    "Getting Apps Failed");
+                return;
             }
 
-            // Changing layout after updating
+            // Change layout after updating
             if (InvokeRequired)
             {
                 BeginInvoke(new MethodInvoker(applyAppSelectLayout));
